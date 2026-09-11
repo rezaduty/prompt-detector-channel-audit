@@ -328,6 +328,26 @@ def main():
                 FAILURES.append(f"caption of {lab} asserts a finding with no "
                                 f"citation and no section reference")
 
+        # Deictic pointers that depend on where text lands on the page, or
+        # that make the reader count back through a list, do not survive
+        # two-column float placement. Each must name what it refers to.
+        VAGUE = {
+            r"\bwork above\b": "positional reference to earlier text",
+            r"\b(numbers|figures|rates|results|table|tables) below\b":
+                "positional reference to later text",
+            r"\bthe (former|latter)\b": "forces the reader to backtrack",
+            r"\bthe other two\b": "does not name what it refers to",
+            r"\bfall\s?backs?\b": "unexplained fallback",
+            r"\bfails here\b": "'here' does not name the group",
+            r"\bOnly the (first|second|third|fourth)\b":
+                "refers to a list item by position",
+        }
+        for pat, why in VAGUE.items():
+            for m in re.finditer(pat, body, re.I):
+                line = body[:m.start()].count("\n") + 1
+                FAILURES.append(f"Paper.tex line {line}: {m.group(0)!r} is "
+                                f"a vague reference ({why})")
+
         # Semicolons are not used in this paper's prose. LaTeX spacing
         # commands such as \; and \quad are markup, not punctuation.
         prose = body.replace("\\;", " ").replace("\\,", " ").replace("\\:", " ")

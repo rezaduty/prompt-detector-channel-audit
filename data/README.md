@@ -29,8 +29,8 @@ the two coincide.
 | --- | --- | --- |
 | `id` | string | stable identifier, e.g. `s5_dec_02` |
 | `text` | string | the probe |
-| `true_label` | `S5` \| `S6` \| `SAFE` | taxonomy label, see below |
-| `phrasing` | string | surface-form group, see below |
+| `true_label` | `S5` \| `S6` \| `SAFE` | taxonomy label, see *Composition* |
+| `phrasing` | string | surface-form group, see *Composition* |
 | `is_prompt` | bool | whether the text is a prompt artifact |
 
 `true_label` follows the taxonomy of the detector under measurement, served by
@@ -59,11 +59,11 @@ surface feature rather than on intent will fire on them. A plain accuracy
 figure over attacks and ordinary questions hides that reliance.
 
 - `legit_prompt` is instruction-shaped and benign. A detector that treats
-  instruction-like text as an attack fails here.
+  instruction-like text as an attack fails on this group.
 - `security_doc` quotes attack vocabulary in benign text, for example a
   sentence explaining that injection attacks begin with the phrase *ignore
   previous instructions*. A detector keyed on vocabulary rather than intent
-  fails here.
+  fails on this group.
 - `benign_template` carries unfenced `{placeholder}` syntax with no attack
   content.
 
@@ -71,8 +71,8 @@ figure over attacks and ordinary questions hides that reliance.
 
 Attack probes average 72.8 characters and benign probes 63.1, and length alone
 separates the classes at an AUROC of 62.4%. This is deliberate. In the external
-corpus below, injections are more than twice as long as benign items and length
-alone separates them at 79.3%, which is enough for a length-sensitive scorer to
+corpus described in section 2, injections are more than twice as long as
+benign items and length alone separates them at 79.3%, which is enough for a length-sensitive scorer to
 look skilful without doing the task. Holding length roughly equal removes that
 shortcut so the phrasing and prompt-shapedness axes carry the comparison.
 
@@ -85,9 +85,9 @@ shortcut so the phrasing and prompt-shapedness axes carry the comparison.
 - **Group sizes are small.** Several groups hold 4 to 8 items. Per-group rates
   carry wide Wilson intervals and should be read as directional unless a
   significance test is quoted alongside.
-- Base rates are not realistic. Benign items are 40 of 91; real traffic is
-  overwhelmingly benign, so false-positive rates measured here translate into
-  worse precision in deployment.
+- Base rates are not realistic. Benign items are 40 of 91, while real traffic
+  is overwhelmingly benign, so the false-positive rates measured on this set
+  translate into worse precision in deployment.
 - Payloads are **not adaptive**. Nothing was optimised against the detector, so
   every detection rate is an upper bound.
 

@@ -20,12 +20,12 @@ determine what question each output actually answers.
 | Finding | Evidence |
 | --- | --- |
 | The weighted score measures whether text is a **prompt**, not whether it is an **attack** | separates prompt-shaped text at 97.8% AUROC, attacks at 32.5%, below chance |
-| Weight calibration cannot fix that | 1000 sampled weight vectors peak at 45.0% AUROC, never above chance; 7 of 10 weights never fire on chat traffic |
+| Weight calibration cannot fix that | 1000 sampled weight vectors peak at 45.0% AUROC, never above chance, and 7 of 10 weights never fire on chat traffic |
 | The rule channel matches vocabulary, not intent | 8 of the 9 benign items its injection-phrase rule flags are security documentation quoting attack phrases |
 | Guard models carry the binary verdict but not the label | neither assigns the jailbreak code to any jailbreak probe, despite 40 jailbreak rows in the trained model's training set |
 | Degenerate multi-code verdicts inflate per-category recall | by 10.3 points on the zero-shot guard |
-| A model's own recorded metric can be uninformative | recorded binary F1 of 1.0 against a 35.0% benign false-positive rate measured here, 75.0% on an external corpus |
-| Public benchmarks can flatter a detector through a length confound | on the external corpus length alone scores 79.3% AUROC, higher than the score's 63.0%; stratifying by length collapses it to near chance |
+| A model's own recorded metric can be uninformative | recorded binary F1 of 1.0 against a 35.0% benign false-positive rate on the probe set and 75.0% on an external corpus |
+| Public benchmarks can flatter a detector through a length confound | on the external corpus length alone scores 79.3% AUROC, higher than the score's 63.0%, and stratifying by length collapses it to near chance |
 
 ## Repository layout
 
@@ -129,7 +129,7 @@ See [`CITATION.cff`](CITATION.cff).
 
 Results describe one deployed detector and its two guard backends. Probes are
 non-adaptive, so every detection rate is an upper bound. The probe set carries
-one annotator and small per-group sizes; per-group comparisons are directional
+one annotator and small per-group sizes, so per-group comparisons are directional
 unless a significance test is quoted. The trained guard was fine tuned on 60
 rows from the external corpus, so its numbers on that corpus are an optimistic
 bound. See the paper's limitations section and

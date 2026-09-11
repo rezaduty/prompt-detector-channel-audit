@@ -208,13 +208,13 @@ tables~\cite{fisher1922interpretation}. The joint weight exploration follows
 random search, which dominates grid search for the same
 budget in comparable settings~\cite{bergstra2012random}.
 
-\subsection{What is new here}\label{sec:novelty}
+\subsection{What is new in this paper}\label{sec:novelty}
 
 Existing evaluations treat a detector as a black box and score it on an attack
 corpus, which answers how often it fires. We treat the detector as a
 configurable system and ask which question each of its outputs decides, which
 requires a different instrument. Eight things in this paper do not appear in the
-work above.
+work surveyed in this section.
 
 \emph{Parameter identifiability as a detector property.} We ask which of a
 detector's tunable weights can be estimated from the traffic it sees at all,
@@ -222,7 +222,7 @@ which is the standard identifiability question in statistical
 modelling~\cite{hastie2009elements} and, to our knowledge, has not been applied
 to a deployed guardrail. It separates a weight that is set badly from one that
 cannot be set at all, and Section~\ref{sec:channels} finds
-\NSignalsInert{} of \NSignalsTotal{} in the second class.
+\NSignalsInert{} of \NSignalsTotal{} weights that cannot be set at all.
 
 \emph{Exhausting the reachable configuration space.} Rather than evaluating the
 shipped weights, we sample the joint weight space
@@ -322,14 +322,15 @@ signals fire on body length, template placeholders, and few-shot
 markers~\cite{brown2020language}. Each
 signal has an integer weight, editable at runtime. The sum is compared against
 band thresholds to produce a label of none, low, medium, or high. The full
-signal list with shipped weights is in Appendix~\ref{app:signals}.
+signal list with shipped weights is in Appendix~\ref{app:signals},
+Table~\ref{tab:signalweights}.
 
 \textbf{Risk flags.} Four boolean pattern rules, evaluated independently of the
 score: a prompt built by concatenation with an externally-sourced identifier,
 a template placeholder with no nearby delimiter, text matching the
 application's own injection-pattern list, and system content sharing a source
-expression with user input. Only the third targets the content of an incoming
-message. Its patterns are listed in Appendix~\ref{app:flags}.
+expression with user input. Only the injection-pattern rule targets the content of an
+incoming message. Its patterns are listed in Appendix~\ref{app:flags}.
 
 \textbf{Guard model.} A classifier prompted with a written policy of eight
 categories and returning a one-line verdict. Category S5 is prompt injection
@@ -342,8 +343,8 @@ alone.
 The \emph{trained guard} adds a low-rank adaptation (LoRA)
 adapter~\cite{hu2022lora} to
 \BaseTr{}. We take its training composition from the service's own record of
-the model rather than describing it from memory, and the numbers below are
-generated from that record. It was trained on \NTrainTotalTr{} labelled rows,
+the model rather than describing it from memory, and the figures in this
+paragraph are generated from that record. It was trained on \NTrainTotalTr{} labelled rows,
 split \NTrainSplitTr{} for training and \NTestSplitTr{} for test.
 \NExternalRowsTr{} of those rows come from \NExternalSourcesTr{} public
 dataset, \ExternalSourceListTr{}~\cite{deepset_promptinjections}, a corpus of
@@ -402,12 +403,13 @@ groups:
 \item \textbf{Legitimate prompts} (\NLegit{}): real system prompts, for example
   an instruction to classify support tickets, or a prompt assigned to a
   \texttt{system\_prompt} variable. These are prompt shaped and benign. Any
-  detector that treats instruction-like text as an attack fails here.
+  detector that treats instruction-like text as an attack fails on this
+  group.
 \item \textbf{Security documentation} (\NDoc{}): benign text that quotes attack
   vocabulary, for example a sentence explaining that injection attacks begin
   with the phrase ``ignore previous instructions'', or a request to write a
   test asserting that a guard rejects such a message. Any detector keyed on
-  attack vocabulary rather than intent fails here.
+  attack vocabulary rather than intent fails on this group.
 \item \textbf{Benign templates} (\NTmpl{}): ordinary templated text with
   unfenced placeholders, which is the pattern the missing-delimiter flag
   matches.
@@ -450,8 +452,8 @@ rescored, \NSearchCells{} cells. This tests the reachable configuration space
 rather than one-at-a-time perturbations of the shipped point.
 
 \textbf{P4, threshold sweep.} The noise floor and the low-band threshold are
-moved together, since the band label is gated by the latter, and every probe
-rescored.
+moved together, since the band label is gated by the low-band
+threshold, and every probe rescored.
 
 \textbf{P5, rule extension.} Three pattern rules targeting declarative and
 indirect phrasing are added through the custom risk-flag interface, every probe
@@ -793,7 +795,7 @@ Table~\ref{tab:guard} summarises the two guards.
 \begin{table*}[t]
 \centering
 \caption{Guard-model panel. Strict S5 recall discounts verdicts that list five
-or more of the eight categories. Degenerate is the rate of such verdicts.}
+or more of the eight categories. Degenerate is the rate of those verdicts.}
 \label{tab:guard}
 \small
 \input{tables/tab_guard.tex}
@@ -912,9 +914,9 @@ a larger external benign set is in Section~\ref{sec:external}.}
 
 The service can return a per-input rationale. The zero-shot guard returns one
 on \ExplainCoverageZs{}\% of probes. The trained guard returns none
-(\ExplainCoverageTr{}\%), so only the former can be audited, and the trained
-row of Table~\ref{tab:explain} is an empty denominator rather than a clean
-score.
+(\ExplainCoverageTr{}\%), so only the zero-shot guard can be audited, and the
+trained row of Table~\ref{tab:explain} is an empty denominator rather than a
+clean score.
 
 We score rationales on the \NExplainScoredZs{} unsafe verdicts with three
 deterministic checks: the rationale affirmatively names a category the verdict
@@ -979,7 +981,7 @@ Two consequences follow. The first is for anyone reading a guard model's
 advertised score. An evaluation computed on a split of the model's own training
 pool certifies reproducibility of the generator, not detection quality, and the
 gap between \ReportedFOneTr{} and a \BinFprTr{}\% benign false-positive rate
-is the size of that difference here. The second is for the
+is the size of that difference for this model. The second is for the
 comparison in Section~\ref{sec:guard}: the trained guard's advantage in attack
 recall over the zero-shot guard is real and measured on the same probes, but it
 is not the advantage its recorded metric advertises.
@@ -996,7 +998,7 @@ One caveat applies to one row of the comparison. The trained guard was fine
 tuned on \NExternalRowsTr{} rows drawn from this same corpus
 (Appendix~\ref{app:models}), and the service does not record which rows, so we
 cannot rule out overlap between its training data and this test split. Its
-numbers below are an optimistic bound. The rule channels and the zero-shot
+rates in this section are an optimistic bound. The rule channels and the zero-shot
 guard have no training data at all, so for them this corpus is a clean external
 test.
 
@@ -1004,7 +1006,8 @@ test.
 
 Table~\ref{tab:external} puts both sets side by side. The band channel stays
 inert, firing on \ExtBandTpr{}\% of external injections. The flag channel drops
-from \FlagTprAttack{}\% recall on our probes to \ExtFlagTpr{}\% here, because
+from \FlagTprAttack{}\% recall on our probes to \ExtFlagTpr{}\% on the
+external corpus, because
 the pattern list was written against a narrower vocabulary than this corpus
 uses, though its false-positive rate also falls to \ExtFlagFpr{}\% because the
 benign half contains no security documentation.
@@ -1027,7 +1030,8 @@ this corpus.}
 \input{tables/tab_external.tex}
 \end{table}
 
-\subsection{The score channel looks better here for the wrong reason}
+\subsection{The score channel looks better on the external corpus for the
+wrong reason}
 \label{sec:confound}
 
 On this corpus the salience score separates injections from benign text at
@@ -1051,9 +1055,10 @@ between-stratum comparison.
 
 Our probe set does not show this effect because it was written with the two
 classes at comparable length, \ProbeMeanLenAttack{} characters against
-\ProbeMeanLenBenign{}, where length alone gives \ProbeAurocLength{}\%. That was
-a design choice about which features the probes hold constant, and it is what
-lets the phrasing and prompt-shapedness axes carry the comparison instead.
+\ProbeMeanLenBenign{}, where length alone gives \ProbeAurocLength{}\%. Matching the
+two classes on length was a design choice about which features the probes hold
+constant, and it is what lets the phrasing and prompt-shapedness axes carry the
+comparison instead.
 
 This is the familiar shortcut problem~\cite{geirhos2020shortcut,
 lapuschkin2019cleverhans} arriving in guardrail evaluation: a benchmark built
@@ -1175,7 +1180,8 @@ length confounds the external corpus and that our probes hold length roughly
 constant. We did not control every surface variable that might differ between
 the two classes, so other confounds may remain in both sets.
 
-\textbf{Base rate.} Benign traffic is \NSafe{} of \NProbes{} probes here. Real
+\textbf{Base rate.} Benign traffic is \NSafe{} of \NProbes{} probes in the
+probe set. Real
 traffic is overwhelmingly benign, so the false-positive rates we report
 translate into far worse precision in deployment than these numbers
 suggest~\cite{axelsson2000baserate}.
@@ -1366,6 +1372,7 @@ few shot markers & supporting & 6 & \Firesfewshotmarkers{} \\
 Band thresholds as shipped: noise floor 15, low 15, medium 40, high 70. The
 linguistic weight is the per-hit value, 4, times the number of distinct phrase
 hits, capped at the listed weight.}
+\label{tab:signalweights}
 \end{table}
 
 \section{Shipped Risk Flags}\label{app:flags}
@@ -1452,6 +1459,7 @@ Base models are from the Qwen2.5 family~\cite{qwen2024report} and the
 adaptation method is low-rank adaptation (LoRA)~\cite{hu2022lora}. The
 recorded $F_1$ is the service's own figure on the model's held-out split. The
 measured rows are this paper's probe set.}
+\label{tab:backends}
 \end{table*}
 
 The adapter is configured with rank 8, scaling factor 16, dropout 0.05, applied
@@ -1588,7 +1596,8 @@ benign template & Hello \{name\}, your order \{order\_id\} shipped today. \\
 \section{Artifact Availability}\label{app:artifact}
 
 The probe set, the experiment scripts, the raw measurement outputs, and the
-verifier are published as a single repository~\cite{rashidi2026artifact} at
+verifier are published as a single repository~\cite{rashidi2026artifact}, laid out in
+Table~\ref{tab:artifact}, at
 
 \begin{center}
 \url{https://github.com/rezaduty/prompt-detector-channel-audit}
@@ -1629,6 +1638,7 @@ Path & Contents \\
 \caption{Artifact contents. Every number in this paper is re-derived from
 \texttt{results/} by \texttt{src/verify\_numbers.py}, which the build requires
 to pass.}
+\label{tab:artifact}
 \end{table*}
 
 Two properties of the artifact support checking the claims here rather than
