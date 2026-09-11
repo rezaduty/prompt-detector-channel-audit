@@ -1,0 +1,121 @@
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;font-family:Arial,Helvetica,sans-serif}
+  @page{size:1100px 600px;margin:0}
+  body{width:1100px;height:600px;position:relative;background:#fff;color:#1f2733}
+  .ttl{position:absolute;left:24px;top:20px;font-size:18px;letter-spacing:2px;
+       text-transform:uppercase;color:#8a93a2;font-weight:bold}
+  .zone{position:absolute;border-radius:16px;border:2px dashed #cfd4dc}
+  .zlab{position:absolute;font-size:17px;letter-spacing:1.4px;
+        text-transform:uppercase;color:#8a93a2;font-weight:bold}
+  .box{position:absolute;border-radius:14px;overflow:hidden;
+       box-shadow:0 1px 3px rgba(20,28,43,.10);
+       padding:8px 10px;display:flex;flex-direction:column;align-items:center;
+       justify-content:center;text-align:center}
+  .t{font-size:21px;font-weight:bold;line-height:1.25}
+  .s{font-size:17px;color:#6b7280;line-height:1.3;margin-top:5px}
+  .node{background:#f6f7f9;border:2px solid #d9dde4}
+  .atk{background:#fdeef1;border:2px solid #e4485f;color:#c23a4f}
+  .def{background:#e9f5ef;border:2px solid #2f7d68}
+  .out{background:#eef5fc;border:2px solid #245b81}
+  svg.wires{position:absolute;inset:0;width:1100px;height:600px}
+  .badge{position:absolute;border-radius:10px;padding:5px 11px;font-size:16px;
+         font-weight:bold}
+  .br{background:#fdeef1;border:2px solid #e4485f;color:#c23a4f}
+  .bg{background:#e9f5ef;border:2px solid #2f7d68;color:#2f7d68}
+  .lg{position:absolute;left:24px;top:512px;width:440px;font-size:17px;
+      color:#6b7280;line-height:1.55}
+  .sw{display:inline-block;width:26px;height:0;border-top:3px solid #8a93a2;
+      vertical-align:middle;margin-right:7px}
+  .swr{border-top:3px dashed #c23a4f}
+</style>
+
+<div class="ttl">Two detection channels behind one label</div>
+
+<svg class="wires">
+  <defs>
+    <marker id="ag" markerWidth="8" markerHeight="8" refX="7" refY="3.5"
+            orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#8a93a2"/></marker>
+    <marker id="ar" markerWidth="8" markerHeight="8" refX="7" refY="3.5"
+            orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#c23a4f"/></marker>
+    <marker id="ab" markerWidth="8" markerHeight="8" refX="7" refY="3.5"
+            orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#245b81"/></marker>
+  </defs>
+
+  <path d="M212,255 C240,255 240,306 264,306" stroke="#8a93a2" stroke-width="2.2"
+        fill="none" marker-end="url(#ag)"/>
+  <path d="M212,395 C240,395 240,344 264,344" stroke="#c23a4f" stroke-width="2.2"
+        fill="none" stroke-dasharray="7 4" marker-end="url(#ar)"/>
+
+  <path d="M444,300 C478,300 478,170 504,170" stroke="#8a93a2" stroke-width="2.2"
+        fill="none" marker-end="url(#ag)"/>
+  <path d="M444,325 C478,325 478,335 504,335" stroke="#8a93a2" stroke-width="2.2"
+        fill="none" marker-end="url(#ag)"/>
+  <path d="M444,350 C478,350 478,490 504,490" stroke="#8a93a2" stroke-width="2.2"
+        fill="none" marker-end="url(#ag)"/>
+
+  <line x1="754" y1="170" x2="808" y2="170" stroke="#245b81" stroke-width="2.2"
+        marker-end="url(#ab)"/>
+  <line x1="754" y1="335" x2="808" y2="335" stroke="#245b81" stroke-width="2.2"
+        marker-end="url(#ab)"/>
+  <line x1="754" y1="490" x2="808" y2="490" stroke="#245b81" stroke-width="2.2"
+        marker-end="url(#ab)"/>
+</svg>
+
+<div class="zone" style="left:24px;top:170px;width:200px;height:310px"></div>
+<div class="zlab" style="left:38px;top:182px">Input</div>
+<div class="box node" style="left:40px;top:205px;width:168px;height:100px">
+  <div class="t">Benign traffic</div>
+  <div class="s">questions, system prompts, documentation</div>
+</div>
+<div class="box atk" style="left:40px;top:345px;width:168px;height:100px">
+  <div class="t">Injection</div>
+  <div class="s">imperative, declarative, indirect</div>
+</div>
+
+<div class="zone" style="left:256px;top:170px;width:200px;height:310px"></div>
+<div class="zlab" style="left:270px;top:182px">Scanner</div>
+<div class="box node" style="left:272px;top:275px;width:168px;height:100px">
+  <div class="t">Detection pipeline</div>
+  <div class="s">one entry point, three outputs</div>
+</div>
+
+<div class="zone" style="left:496px;top:90px;width:270px;height:470px"></div>
+<div class="zlab" style="left:510px;top:102px">Channels</div>
+<div class="box out" style="left:512px;top:128px;width:238px;height:112px">
+  <div class="t">Salience score</div>
+  <div class="s">weighted sum over signals, weights editable</div>
+</div>
+<div class="box out" style="left:512px;top:285px;width:238px;height:100px">
+  <div class="t">Risk flags</div>
+  <div class="s">fixed attack-phrase patterns</div>
+</div>
+<div class="box out" style="left:512px;top:440px;width:238px;height:112px">
+  <div class="t">Guard model</div>
+  <div class="s">classifier returning taxonomy codes</div>
+</div>
+
+<div class="zone" style="left:800px;top:90px;width:276px;height:470px"></div>
+<div class="zlab" style="left:814px;top:102px">Question each answers</div>
+<div class="box def" style="left:816px;top:128px;width:244px;height:112px">
+  <div class="t">Is this text a prompt</div>
+  <div class="s">separates prompt shaped from ordinary text</div>
+</div>
+<div class="box def" style="left:816px;top:285px;width:244px;height:100px">
+  <div class="t">Does it quote attack words</div>
+  <div class="s">fires on documentation too</div>
+</div>
+<div class="box def" style="left:816px;top:440px;width:244px;height:112px">
+  <div class="t">Does it read as an attack</div>
+  <div class="s">cannot see where the text came from</div>
+</div>
+
+<div class="badge br" style="left:512px;top:250px">calibration acts only here</div>
+<div class="badge br" style="left:816px;top:250px">not the injection question</div>
+<div class="badge bg" style="left:816px;top:396px">provenance is missing</div>
+
+<div class="lg">
+  <span class="sw"></span>benign path
+  &nbsp;&nbsp;&nbsp;<span class="sw swr"></span>attack path<br>
+  A deployment that gates on the band label reads the salience channel
+  and never reaches the other two.
+</div>

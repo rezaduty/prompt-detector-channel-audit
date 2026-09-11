@@ -1,0 +1,26 @@
+cff-version: 1.2.0
+message: "If you use this artifact, please cite the paper below."
+title: "Calibration Limits of Weighted Rule Signals and Taxonomy Label Inflation in Guard Model Classification of Prompt Injection"
+abstract: >-
+  Measurement artifact for a study of a layered prompt injection detector.
+  Contains a 91-probe diagnostic set crossing taxonomy label with
+  prompt-shapedness, the experiment scripts that drive the detector's own
+  configuration interface, the raw measurement outputs, and a fail-closed
+  verifier that re-derives every number reported in the paper.
+type: software
+license: MIT
+version: 1.0.0
+date-released: "2026-09-11"
+repository-code: "https://github.com/rezaduty/prompt-detector-channel-audit"
+authors:
+  - family-names: Rashidi
+    given-names: Mohammadreza
+    email: reza.sicherheit@gmail.com
+    orcid: "https://orcid.org/0009-0003-7136-7168"
+    affiliation: "AI and Media Analysis Lab, Berlin, Germany"
+keywords:
+  - prompt injection
+  - guard models
+  - detection calibration
+  - false positives
+  - OWASP LLM01

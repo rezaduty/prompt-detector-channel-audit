@@ -1,0 +1,398 @@
+% ---------------------------------------------------------------- standards
+@misc{owasp2026,
+  author       = {{OWASP GenAI Security Project}},
+  title        = {{OWASP} Top 10 for {LLM} Applications 2026, Version 2026},
+  year         = {2026},
+  howpublished = {\url{https://genai.owasp.org/}},
+  note         = {LLM01:2026 Prompt Injection}
+}
+
+@misc{owasp2025,
+  author       = {{OWASP Foundation}},
+  title        = {{OWASP} Top 10 for Large Language Model Applications 2025},
+  year         = {2025},
+  howpublished = {\url{https://owasp.org/www-project-top-10-for-large-language-model-applications/}},
+  note         = {LLM01 Prompt Injection, LLM07 System Prompt Leakage}
+}
+
+@misc{mitre_atlas,
+  author       = {{MITRE Corporation}},
+  title        = {{MITRE ATLAS}: Adversarial Threat Landscape for Artificial-Intelligence Systems},
+  year         = {2024},
+  howpublished = {\url{https://atlas.mitre.org}},
+  note         = {Technique AML.T0051, LLM Prompt Injection}
+}
+
+@techreport{nist_aiml_2025,
+  author      = {Vassilev, Apostol and Oprea, Alina and Fordyce, Alie and Anderson, Hyrum},
+  title       = {Adversarial Machine Learning: A Taxonomy and Terminology of Attacks and Mitigations},
+  institution = {National Institute of Standards and Technology},
+  number      = {NIST AI 100-2 E2025},
+  year        = {2025},
+  doi          = {10.6028/NIST.AI.100-2e2025},
+  url          = {https://doi.org/10.6028/NIST.AI.100-2e2025}
+}
+
+% ---------------------------------------------------------------- attacks
+@inproceedings{perez2022ignore,
+  author    = {Perez, F\'{a}bio and Ribeiro, Ian},
+  title     = {Ignore Previous Prompt: Attack Techniques for Language Models},
+  booktitle = {NeurIPS 2022 Workshop on ML Safety},
+  year      = {2022},
+  note      = {arXiv:2211.09527},
+  url          = {https://arxiv.org/abs/2211.09527}
+}
+
+@inproceedings{greshake2023not,
+  author    = {Greshake, Kai and Abdelnabi, Sahar and Mishra, Shailesh and Endres, Christoph and Holz, Thorsten and Fritz, Mario},
+  title     = {Not What You've Signed Up For: Compromising Real-World {LLM}-Integrated Applications with Indirect Prompt Injection},
+  booktitle = {Proceedings of the 16th ACM Workshop on Artificial Intelligence and Security (AISec)},
+  year      = {2023},
+  pages     = {79--90},
+  note      = {arXiv:2302.12173},
+  doi          = {10.1145/3605764.3623985},
+  url          = {https://doi.org/10.1145/3605764.3623985}
+}
+
+@article{liu2023prompt,
+  author  = {Liu, Yi and Deng, Gelei and Li, Yuekang and Wang, Kailong and Zhang, Tianwei and Liu, Yepang and Wang, Haoyu and Zheng, Yan and Liu, Yang},
+  title   = {Prompt Injection Attack against {LLM}-Integrated Applications},
+  journal = {arXiv preprint arXiv:2306.05499},
+  year    = {2023},
+  url          = {https://arxiv.org/abs/2306.05499}
+}
+
+@inproceedings{liu2024formalizing,
+  author    = {Liu, Yupei and Jia, Yuqi and Geng, Runpeng and Jia, Jinyuan and Gong, Neil Zhenqiang},
+  title     = {Formalizing and Benchmarking Prompt Injection Attacks and Defenses},
+  booktitle = {33rd USENIX Security Symposium},
+  year      = {2024},
+  pages     = {1831--1847},
+  url          = {https://www.usenix.org/conference/usenixsecurity24/presentation/liu-yupei}
+}
+
+@inproceedings{wei2023jailbroken,
+  author    = {Wei, Alexander and Haghtalab, Nika and Steinhardt, Jacob},
+  title     = {Jailbroken: How Does {LLM} Safety Training Fail?},
+  booktitle = {Advances in Neural Information Processing Systems 36},
+  year      = {2023},
+  note      = {arXiv:2307.02483},
+  url          = {https://arxiv.org/abs/2307.02483}
+}
+
+@article{zou2023universal,
+  author  = {Zou, Andy and Wang, Zifan and Carlini, Nicholas and Nasr, Milad and Kolter, J. Zico and Fredrikson, Matt},
+  title   = {Universal and Transferable Adversarial Attacks on Aligned Language Models},
+  journal = {arXiv preprint arXiv:2307.15043},
+  year    = {2023},
+  url          = {https://arxiv.org/abs/2307.15043}
+}
+
+@misc{willison2023injection,
+  author       = {Willison, Simon},
+  title        = {Prompt Injection: What's the Worst That Can Happen?},
+  year         = {2023},
+  howpublished = {\url{https://simonwillison.net/2023/Apr/14/worst-that-can-happen/}}
+}
+
+@misc{willison2025trifecta,
+  author       = {Willison, Simon},
+  title        = {The Lethal Trifecta for {AI} Agents: Private Data, Untrusted Content, and External Communication},
+  year         = {2025},
+  howpublished = {\url{https://simonwillison.net/2025/Jun/16/the-lethal-trifecta/}}
+}
+
+% ---------------------------------------------------------------- defenses
+@inproceedings{rebedea2023nemo,
+  author    = {Rebedea, Traian and Dinu, Razvan and Sreedhar, Makesh Narsimhan and Parisien, Christopher and Cohen, Jonathan},
+  title     = {{NeMo Guardrails}: A Toolkit for Controllable and Safe {LLM} Applications with Programmable Rails},
+  booktitle = {Proceedings of the 2023 Conference on Empirical Methods in Natural Language Processing: System Demonstrations},
+  year      = {2023},
+  pages     = {431--445},
+  doi          = {10.18653/v1/2023.emnlp-demo.40},
+  url          = {https://doi.org/10.18653/v1/2023.emnlp-demo.40}
+}
+
+@misc{nemo_guardrails_repo,
+  author       = {{NVIDIA Corporation}},
+  title        = {{NeMo Guardrails}},
+  year         = {2024},
+  howpublished = {\url{https://github.com/NVIDIA/NeMo-Guardrails}}
+}
+
+@article{inan2023llamaguard,
+  author  = {Inan, Hakan and Upasani, Kartikeya and Chi, Jianfeng and Rungta, Rashi and Iyer, Krithika and Mao, Yuning and Tontchev, Michael and Hu, Qing and Fuller, Brian and Testuggine, Davide and Khabsa, Madian},
+  title   = {{Llama Guard}: {LLM}-based Input-Output Safeguard for Human-{AI} Conversations},
+  journal = {arXiv preprint arXiv:2312.06674},
+  year    = {2023},
+  url          = {https://arxiv.org/abs/2312.06674}
+}
+
+@article{hines2024spotlighting,
+  author  = {Hines, Keegan and Lopez, Gary and Hall, Matthew and Zarfati, Federico and Zunger, Yonatan and Kiciman, Emre},
+  title   = {Defending Against Indirect Prompt Injection Attacks with Spotlighting},
+  journal = {arXiv preprint arXiv:2403.14720},
+  year    = {2024},
+  url          = {https://arxiv.org/abs/2403.14720}
+}
+
+@inproceedings{chen2025struq,
+  author    = {Chen, Sizhe and Piet, Julien and Sitawarin, Chawin and Wagner, David},
+  title     = {{StruQ}: Defending against Prompt Injection with Structured Queries},
+  booktitle = {34th USENIX Security Symposium},
+  year      = {2025},
+  note      = {arXiv:2402.06363},
+  url          = {https://arxiv.org/abs/2402.06363}
+}
+
+@article{nasr2025adaptive,
+  author  = {Nasr, Milad and Carlini, Nicholas and Rando, Javier and Tram\`{e}r, Florian and others},
+  title   = {The Attacker Moves Second: Stronger Adaptive Attacks Bypass Defenses against Jailbreaks and Prompt Injections},
+  journal = {arXiv preprint},
+  year    = {2025},
+  note    = {Surveyed in \cite{owasp2026}, prevention item 11},
+  url          = {https://arxiv.org/abs/2510.09023}
+}
+
+% ---------------------------------------------------------------- benchmarks
+@inproceedings{debenedetti2024agentdojo,
+  author    = {Debenedetti, Edoardo and Zhang, Jie and Balunovi\'{c}, Mislav and Beurer-Kellner, Luca and Fischer, Marc and Tram\`{e}r, Florian},
+  title     = {{AgentDojo}: A Dynamic Environment to Evaluate Prompt Injection Attacks and Defenses for {LLM} Agents},
+  booktitle = {Advances in Neural Information Processing Systems 37, Datasets and Benchmarks Track},
+  year      = {2024},
+  note      = {arXiv:2406.13352},
+  url          = {https://arxiv.org/abs/2406.13352}
+}
+
+@inproceedings{chao2024jailbreakbench,
+  author    = {Chao, Patrick and Debenedetti, Edoardo and Robey, Alexander and Andriushchenko, Maksym and Croce, Francesco and Sehwag, Vikash and Dobriban, Edgar and Flammarion, Nicolas and Pappas, George J. and Tram\`{e}r, Florian and Hassani, Hamed and Wong, Eric},
+  title     = {{JailbreakBench}: An Open Robustness Benchmark for Jailbreaking Large Language Models},
+  booktitle = {Advances in Neural Information Processing Systems 37, Datasets and Benchmarks Track},
+  year      = {2024},
+  note      = {arXiv:2404.01318},
+  url          = {https://arxiv.org/abs/2404.01318}
+}
+
+@inproceedings{mazeika2024harmbench,
+  author    = {Mazeika, Mantas and Phan, Long and Yin, Xuwang and Zou, Andy and Wang, Zifan and Mu, Norman and Sakhaee, Elham and Li, Nathaniel and Basart, Steven and Li, Bo and Forsyth, David and Hendrycks, Dan},
+  title     = {{HarmBench}: A Standardized Evaluation Framework for Automated Red Teaming and Robust Refusal},
+  booktitle = {Proceedings of the 41st International Conference on Machine Learning},
+  year      = {2024},
+  url          = {https://arxiv.org/abs/2402.04249}
+}
+
+% ---------------------------------------------------------------- datasets
+@misc{deepset_promptinjections,
+  author       = {{deepset}},
+  title        = {{deepset/prompt-injections}: A Labelled Dataset of Prompt Injection and Benign Prompts},
+  year         = {2023},
+  howpublished = {\url{https://huggingface.co/datasets/deepset/prompt-injections}},
+  note         = {The only public corpus contributing to the trained guard measured here}
+}
+
+% ---------------------------------------------------------------- models
+@misc{qwen2024report,
+  author       = {{Qwen Team}},
+  title        = {{Qwen2.5} Technical Report},
+  year         = {2024},
+  howpublished = {\url{https://arxiv.org/abs/2412.15115}}
+}
+
+@inproceedings{hu2022lora,
+  author    = {Hu, Edward J. and Shen, Yelong and Wallis, Phillip and Allen-Zhu, Zeyuan and Li, Yuanzhi and Wang, Shean and Wang, Lu and Chen, Weizhu},
+  title     = {{LoRA}: Low-Rank Adaptation of Large Language Models},
+  booktitle = {International Conference on Learning Representations},
+  year      = {2022},
+  url          = {https://arxiv.org/abs/2106.09685}
+}
+
+@inproceedings{dettmers2023qlora,
+  author    = {Dettmers, Tim and Pagnoni, Artidoro and Holtzman, Ari and Zettlemoyer, Luke},
+  title     = {{QLoRA}: Efficient Finetuning of Quantized {LLMs}},
+  booktitle = {Advances in Neural Information Processing Systems 36},
+  year      = {2023},
+  url          = {https://arxiv.org/abs/2305.14314}
+}
+
+@inproceedings{brown2020language,
+  author    = {Brown, Tom B. and Mann, Benjamin and Ryder, Nick and Subbiah, Melanie and Kaplan, Jared and Dhariwal, Prafulla and Neelakantan, Arvind and Shyam, Pranav and Sastry, Girish and Askell, Amanda and others},
+  title     = {Language Models are Few-Shot Learners},
+  booktitle = {Advances in Neural Information Processing Systems 33},
+  year      = {2020},
+  url          = {https://arxiv.org/abs/2005.14165}
+}
+
+@inproceedings{ouyang2022training,
+  author    = {Ouyang, Long and Wu, Jeffrey and Jiang, Xu and Almeida, Diogo and Wainwright, Carroll L. and Mishkin, Pamela and Zhang, Chong and Agarwal, Sandhini and Slama, Katarina and Ray, Alex and others},
+  title     = {Training Language Models to Follow Instructions with Human Feedback},
+  booktitle = {Advances in Neural Information Processing Systems 35},
+  year      = {2022},
+  url          = {https://arxiv.org/abs/2203.02155}
+}
+
+% ---------------------------------------------------------------- detection theory
+@article{axelsson2000baserate,
+  author  = {Axelsson, Stefan},
+  title   = {The Base-Rate Fallacy and the Difficulty of Intrusion Detection},
+  journal = {ACM Transactions on Information and System Security},
+  volume  = {3},
+  number  = {3},
+  pages   = {186--205},
+  year    = {2000},
+  doi          = {10.1145/357830.357849},
+  url          = {https://doi.org/10.1145/357830.357849}
+}
+
+@inproceedings{johnson2013static,
+  author    = {Johnson, Brittany and Song, Yoonki and Murphy-Hill, Emerson and Bowdidge, Robert},
+  title     = {Why Don't Software Developers Use Static Analysis Tools to Find Bugs?},
+  booktitle = {Proceedings of the 35th International Conference on Software Engineering},
+  year      = {2013},
+  pages     = {672--681},
+  doi          = {10.1109/ICSE.2013.6606613},
+  url          = {https://doi.org/10.1109/ICSE.2013.6606613}
+}
+
+@article{fawcett2006introduction,
+  author  = {Fawcett, Tom},
+  title   = {An Introduction to {ROC} Analysis},
+  journal = {Pattern Recognition Letters},
+  volume  = {27},
+  number  = {8},
+  pages   = {861--874},
+  year    = {2006},
+  doi          = {10.1016/j.patrec.2005.10.010},
+  url          = {https://doi.org/10.1016/j.patrec.2005.10.010}
+}
+
+@article{mann1947test,
+  author  = {Mann, Henry B. and Whitney, Donald R.},
+  title   = {On a Test of Whether One of Two Random Variables is Stochastically Larger than the Other},
+  journal = {The Annals of Mathematical Statistics},
+  volume  = {18},
+  number  = {1},
+  pages   = {50--60},
+  year    = {1947},
+  doi          = {10.1214/aoms/1177730491},
+  url          = {https://doi.org/10.1214/aoms/1177730491}
+}
+
+@article{wilson1927interval,
+  author  = {Wilson, Edwin B.},
+  title   = {Probable Inference, the Law of Succession, and Statistical Inference},
+  journal = {Journal of the American Statistical Association},
+  volume  = {22},
+  number  = {158},
+  pages   = {209--212},
+  year    = {1927},
+  doi          = {10.1080/01621459.1927.10502953},
+  url          = {https://doi.org/10.1080/01621459.1927.10502953}
+}
+
+@article{fisher1922interpretation,
+  author  = {Fisher, Ronald A.},
+  title   = {On the Interpretation of $\chi^2$ from Contingency Tables, and the Calculation of {P}},
+  journal = {Journal of the Royal Statistical Society},
+  volume  = {85},
+  number  = {1},
+  pages   = {87--94},
+  year    = {1922},
+  doi          = {10.2307/2340521},
+  url          = {https://doi.org/10.2307/2340521}
+}
+
+@book{hastie2009elements,
+  author    = {Hastie, Trevor and Tibshirani, Robert and Friedman, Jerome},
+  title     = {The Elements of Statistical Learning},
+  edition   = {2nd},
+  publisher = {Springer},
+  year      = {2009},
+  doi          = {10.1007/978-0-387-84858-7},
+  url          = {https://doi.org/10.1007/978-0-387-84858-7}
+}
+
+@article{bergstra2012random,
+  author  = {Bergstra, James and Bengio, Yoshua},
+  title   = {Random Search for Hyper-Parameter Optimization},
+  journal = {Journal of Machine Learning Research},
+  volume  = {13},
+  pages   = {281--305},
+  year    = {2012},
+  url          = {https://jmlr.org/papers/v13/bergstra12a.html}
+}
+
+% ---------------------------------------------------------------- confounds
+@article{geirhos2020shortcut,
+  author  = {Geirhos, Robert and Jacobsen, J\"{o}rn-Henrik and Michaelis, Claudio and Zemel, Richard and Brendel, Wieland and Bethge, Matthias and Wichmann, Felix A.},
+  title   = {Shortcut Learning in Deep Neural Networks},
+  journal = {Nature Machine Intelligence},
+  volume  = {2},
+  number  = {11},
+  pages   = {665--673},
+  year    = {2020},
+  doi     = {10.1038/s42256-020-00257-z},
+  url     = {https://doi.org/10.1038/s42256-020-00257-z}
+}
+
+@article{lapuschkin2019cleverhans,
+  author  = {Lapuschkin, Sebastian and W\"{a}ldchen, Stephan and Binder, Alexander and Montavon, Gr\'{e}goire and Samek, Wojciech and M\"{u}ller, Klaus-Robert},
+  title   = {Unmasking {Clever Hans} Predictors and Assessing What Machines Really Learn},
+  journal = {Nature Communications},
+  volume  = {10},
+  pages   = {1096},
+  year    = {2019},
+  doi     = {10.1038/s41467-019-08987-4},
+  url     = {https://doi.org/10.1038/s41467-019-08987-4}
+}
+
+@inproceedings{torralba2011bias,
+  author    = {Torralba, Antonio and Efros, Alexei A.},
+  title     = {Unbiased Look at Dataset Bias},
+  booktitle = {IEEE Conference on Computer Vision and Pattern Recognition},
+  year      = {2011},
+  pages     = {1521--1528},
+  doi       = {10.1109/CVPR.2011.5995347},
+  url       = {https://doi.org/10.1109/CVPR.2011.5995347}
+}
+
+@inproceedings{gururangan2018artifacts,
+  author    = {Gururangan, Suchin and Swayamdipta, Swabha and Levy, Omer and Schwartz, Roy and Bowman, Samuel R. and Smith, Noah A.},
+  title     = {Annotation Artifacts in Natural Language Inference Data},
+  booktitle = {Proceedings of the 2018 Conference of the North American Chapter of the Association for Computational Linguistics},
+  year      = {2018},
+  pages     = {107--112},
+  doi       = {10.18653/v1/N18-2017},
+  url       = {https://doi.org/10.18653/v1/N18-2017}
+}
+
+@article{spearman1904,
+  author  = {Spearman, Charles},
+  title   = {The Proof and Measurement of Association between Two Things},
+  journal = {The American Journal of Psychology},
+  volume  = {15},
+  number  = {1},
+  pages   = {72--101},
+  year    = {1904},
+  doi     = {10.2307/1412159},
+  url     = {https://doi.org/10.2307/1412159}
+}
+
+@misc{rashidi2026artifact,
+  author       = {Rashidi, Mohammadreza},
+  title        = {Artifact: Calibration Limits of Weighted Rule Signals and Taxonomy Label Inflation in Guard Model Classification of Prompt Injection},
+  year         = {2026},
+  howpublished = {\url{https://github.com/rezaduty/prompt-detector-channel-audit}},
+  note         = {Probe set, experiment scripts, raw measurement outputs, and the fail-closed verifier. Code MIT, data CC BY 4.0}
+}
+
+@article{gebru2021datasheets,
+  author  = {Gebru, Timnit and Morgenstern, Jamie and Vecchione, Briana and Vaughan, Jennifer Wortman and Wallach, Hanna and Daum\'{e} III, Hal and Crawford, Kate},
+  title   = {Datasheets for Datasets},
+  journal = {Communications of the ACM},
+  volume  = {64},
+  number  = {12},
+  pages   = {86--92},
+  year    = {2021},
+  doi     = {10.1145/3458723},
+  url     = {https://doi.org/10.1145/3458723}
+}

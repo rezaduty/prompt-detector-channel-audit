@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+.DS_Store
+.venv/
+venv/
+
+# LaTeX build products; Paper.pdf is tracked deliberately.
+paper/*.aux
+paper/*.log
+paper/*.out
+paper/*.blg
+paper/*.bbl
+paper/*.xdv
+paper/*.fls
+paper/*.fdb_latexmk

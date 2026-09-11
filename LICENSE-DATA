@@ -1,0 +1,23 @@
+Creative Commons Attribution 4.0 International (CC BY 4.0)
+
+Copyright (c) 2026 Mohammadreza Rashidi
+
+The probe set in data/ and the derived measurement outputs in results/ are
+licensed under the Creative Commons Attribution 4.0 International License.
+
+You are free to share and adapt this material for any purpose, including
+commercially, provided you give appropriate credit, provide a link to the
+license, and indicate if changes were made.
+
+Full licence text: https://creativecommons.org/licenses/by/4.0/legalcode
+
+ATTRIBUTION
+    Rashidi, M. (2026). Calibration Limits of Weighted Rule Signals and
+    Taxonomy Label Inflation in Guard Model Classification of Prompt
+    Injection. Artifact: https://github.com/rezaduty/prompt-detector-channel-audit
+
+THIRD-PARTY DATA
+    This repository does not redistribute the deepset/prompt-injections
+    corpus. That corpus is published separately by deepset under CC BY 4.0 at
+    https://huggingface.co/datasets/deepset/prompt-injections and is read from
+    the local Hugging Face cache at run time. Its labels are the publisher's.
