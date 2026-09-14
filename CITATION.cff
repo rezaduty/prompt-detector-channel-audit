@@ -15,9 +15,9 @@ repository-code: "https://github.com/rezaduty/prompt-detector-channel-audit"
 authors:
   - family-names: Rashidi
     given-names: Mohammadreza
-    email: reza.sicherheit@gmail.com
+    email: mohammadreza.rashidi@ue-germany.de
     orcid: "https://orcid.org/0009-0003-7136-7168"
-    affiliation: "AI and Media Analysis Lab, Berlin, Germany"
+    affiliation: "Department of Computer Science, AI and Media Analysis Lab, Berlin, Germany"
 keywords:
   - prompt injection
   - guard models
