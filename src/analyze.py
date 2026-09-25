@@ -639,6 +639,7 @@ def main():
 
     # ---------------------------------------------------- emit
     write_metrics()
+    panel_comparison(base)
     write_macros()
     write_tables(base, sweep_rows, guard_rows, explain_rows, th_rows, dfn, any_flag)
     write_training_table(train_rows)
@@ -750,6 +751,157 @@ def analyze_explanations(base):
 
 
 # ------------------------------------------------ writers
+
+PANEL = [("protectai", "ProtectAI DeBERTa v2"), ("piguard", "PIGuard"), ("deepset", "deepset DeBERTa"),
+         ("fmops", "DistilBERT (fmops)"), ("llm", "LLM guard, 9B"), ("llm27", "LLM guard, 27B")]
+BENCH = [("benchflag", "Bench flag rules"), ("benchscore", "Bench weighted score"),
+         ("benchzs", "Bench zero-shot guard"), ("benchtr", "Bench trained guard")]
+GROUPS35 = [("attack", "Atk"), ("legit_prompt", "Legit"), ("security_doc", "Doc"),
+            ("benign_template", "Tmpl"), ("benign", "Plain")]
+
+
+def panel_comparison(base):
+    """Seven detectors on the same inputs: the six of the panel (verdicts in
+    results/panel, produced by the companion study's phase 11) and the bench
+    detector's four channels. Counts go to macros as K and N, rates as fractions."""
+    import json as _json
+    pv = [_json.loads(l) for l in (R / "panel" / "verdicts.jsonl").read_text().splitlines()]
+    pan = {(v["id"], v["detector"]): bool(v["flag"]) for v in pv if "error" not in v}
+    flags = {}
+    for _, r in base.iterrows():
+        pid = r["id"]
+        flags[(pid, "benchflag")] = bool(str(r["direct_flags"]).strip() and str(r["direct_flags"]) != "nan")
+        flags[(pid, "benchscore")] = r["direct_band"] in ("medium", "high")
+        flags[(pid, "benchzs")] = str(r["local_bionic_guard_unsafe"]).lower() == "true"
+        flags[(pid, "benchtr")] = str(r["model_67276875f520_unsafe"]).lower() == "true"
+        for d, _ in PANEL:
+            flags[(pid, d)] = pan.get((f"t35_{pid}", d))
+    group = {r["id"]: ("attack" if r["true_label"] in ("S5", "S6") else r["phrasing"]) for _, r in base.iterrows()}
+    ni = pd.read_csv(R / "notinject.csv")
+    ext = pd.read_csv(R / "external.csv")
+    ni_g = R / "notinject_guards.csv"
+    ni_guards = pd.read_csv(ni_g) if ni_g.exists() else None
+    rows = []
+    for d, name in PANEL + BENCH:
+        key = "Pan" + "".join(w.capitalize() for w in d.replace("27", "TwoSeven").split("_"))
+        cells = []
+        for g, G in GROUPS35:
+            ids = [i for i, gg in group.items() if gg == g]
+            xs = [flags[(i, d)] for i in ids if flags.get((i, d)) is not None]
+            put(f"{key}{G}K", int(sum(xs)))
+            put(f"{key}{G}N", len(xs))
+            cells.append((int(sum(xs)), len(xs)))
+        # NotInject and deepset.
+        if d in dict(PANEL):
+            nx = [pan[(i, d)] for i in [f"notinject_{s}_{k:03d}" for s in ("one", "two", "three") for k in range(113)]
+                  if (i, d) in pan]
+            da = [pan[(f"deepset_{k:03d}", d)] for k in range(len(ext)) if ext.label[k] == 1 and (f"deepset_{k:03d}", d) in pan]
+            db = [pan[(f"deepset_{k:03d}", d)] for k in range(len(ext)) if ext.label[k] == 0 and (f"deepset_{k:03d}", d) in pan]
+        elif d == "benchflag":
+            nx = [bool(str(x).strip()) and str(x) != "nan" for x in ni.direct_flags]
+            da = [bool(str(x).strip()) and str(x) != "nan" for x, l in zip(ext.direct_flags, ext.label) if l == 1]
+            db = [bool(str(x).strip()) and str(x) != "nan" for x, l in zip(ext.direct_flags, ext.label) if l == 0]
+        elif d == "benchscore":
+            nx = [b in ("medium", "high") for b in ni.direct_band]
+            da = [b in ("medium", "high") for b, l in zip(ext.direct_band, ext.label) if l == 1]
+            db = [b in ("medium", "high") for b, l in zip(ext.direct_band, ext.label) if l == 0]
+        else:
+            col = "local_bionic_guard_unsafe" if d == "benchzs" else "model_67276875f520_unsafe"
+            nx = [str(x).lower() == "true" for x in ni_guards[col]] if ni_guards is not None else []
+            da = [str(x).lower() == "true" for x, l in zip(ext[col], ext.label) if l == 1]
+            db = [str(x).lower() == "true" for x, l in zip(ext[col], ext.label) if l == 0]
+        # Real instruction-shaped benign text: community role prompts and
+        # arXiv abstracts about prompt injection.
+        rc_path = R / "real_corpora.csv"
+        rp, rd = [], []
+        if d in dict(PANEL):
+            for cid, lst in (("prompts_", rp), ("arxivsec_", rd)):
+                lst += [f for (i, dd), f in pan.items() if dd == d and i.startswith(cid)]
+        elif rc_path.exists():
+            rc = pd.read_csv(rc_path)
+            col = {"benchflag": None, "benchscore": None, "benchzs": "local_bionic_guard_unsafe",
+                   "benchtr": "model_67276875f520_unsafe"}[d]
+            for corp, lst in (("prompts_chat", rp), ("arxiv_security", rd)):
+                sub = rc[rc.corpus == corp]
+                if d == "benchflag":
+                    lst += [bool(str(x).strip()) and str(x) != "nan" for x in sub.direct_flags]
+                elif d == "benchscore":
+                    lst += [b in ("medium", "high") for b in sub.direct_band]
+                else:
+                    lst += [str(x).lower() == "true" for x in sub[col]]
+        for nm, xs in (("NotInject", nx), ("DsAtk", da), ("DsBen", db), ("RealPrompt", rp), ("RealDoc", rd)):
+            put(f"{key}{nm}K", int(sum(xs)))
+            put(f"{key}{nm}N", len(xs))
+            cells.append((int(sum(xs)), len(xs)))
+        rows.append((name, cells))
+    # Instruction-shaped benign text pooled: legitimate prompts, security
+    # documents and templates. Rates as fractions, with Wilson bounds.
+    pooled = {}
+    for name, cells in rows:
+        k = cells[1][0] + cells[2][0] + cells[3][0]
+        n = cells[1][1] + cells[2][1] + cells[3][1]
+        pooled[name] = (k, n)
+    for (d, name) in PANEL + BENCH:
+        key = "Pan" + "".join(w.capitalize() for w in d.replace("27", "TwoSeven").split("_"))
+        k, n = pooled[name]
+        put(f"{key}ShapedK", k)
+        put(f"{key}ShapedN", n)
+    k1, n1 = pooled["PIGuard"]
+    k2, n2 = pooled["deepset DeBERTa"]
+    put("PanShapedPiguardVsDeepsetP", float(fisher_exact([[k1, n1 - k1], [k2, n2 - k2]])[1]))
+    # Benchmark disagreement: the bench flag rules on NotInject against security docs.
+    fr = dict(rows)["Bench flag rules"]
+    put("PanBenchflagNiVsDocP", float(fisher_exact([[fr[5][0], fr[5][1] - fr[5][0]],
+                                                   [fr[2][0], fr[2][1] - fr[2][0]]])[1]))
+    # NotInject against real security documentation, per detector and across
+    # detectors. A benchmark that predicted the other would rank the detector
+    # outputs the same way on both.
+    by_name = dict(rows)
+    ni_rate, doc_rate = [], []
+    for name, cells in rows:
+        (kn, nn), (kd, nd) = cells[5], cells[9]
+        if nn and nd and name != "Bench weighted score":
+            ni_rate.append(kn / nn)
+            doc_rate.append(kd / nd)
+    rho, prho = spearmanr(ni_rate, doc_rate)
+    put("PanNiDocRho", float(rho))
+    put("PanNiDocRhoP", float(prho))
+    put("NPanRanked", len(ni_rate))
+    higher_doc = lower_doc = 0
+    for name, cells in rows:
+        (kn, nn), (kd, nd) = cells[5], cells[9]
+        if not (nn and nd) or name == "Bench weighted score":
+            continue
+        # Bonferroni over the detector outputs compared.
+        if fisher_exact([[kn, nn - kn], [kd, nd - kd]])[1] < 0.05 / len([r for r in rows if r[0] != "Bench weighted score"]):
+            if kd / nd > kn / nn:
+                higher_doc += 1
+            else:
+                lower_doc += 1
+    put("NPanDocHigher", higher_doc)
+    put("NPanCompared", len([r for r in rows if r[0] != "Bench weighted score"]))
+    put("NPanDocLower", lower_doc)
+    for name, key in (("PIGuard", "Piguard"), ("ProtectAI DeBERTa v2", "Protectai")):
+        (kn, nn), (kd, nd) = by_name[name][5], by_name[name][9]
+        put(f"Pan{key}NiVsRealDocP", float(fisher_exact([[kn, nn - kn], [kd, nd - kd]])[1]))
+    # Counts the text states, derived here so none is typed.
+    put("NDetectorsCompared", len(PANEL) + 1)
+    put("CiLevel", 95)  # the level of wilson(), z = 1.96
+    put("NNotInjectItems", len(ni))
+    put("NDetectorRows", len(rows))
+    legit_all = [n for n, c in rows if c[1][1] and c[1][0] == c[1][1]]
+    docs_most = [n for n, c in rows if c[2][1] and c[2][0] * 2 > c[2][1]]
+    put("NFlagAllLegit", len(legit_all))
+    put("NFlagMostDocs", len(docs_most))
+    lines = ["\\begin{tabular}{lrrrrrrrrrr}", "\\toprule",
+             " & \\multicolumn{5}{c}{our probe set} & & \\multicolumn{2}{c}{deepset} & \\multicolumn{2}{c}{real text} \\\\",
+             "detector & atk. & legit. & docs & tmpl. & plain & NotInj. & atk. & ben. & prompts & abstracts \\\\",
+             "\\midrule"]
+    for name, cells in rows:
+        lines.append(name + " & " + " & ".join(f"{k}/{n}" if n else "n/a" for k, n in cells) + " \\\\")
+    lines += ["\\bottomrule", "\\end{tabular}"]
+    (T / "tab_panel.tex").write_text("\n".join(lines) + "\n")
+
 
 def write_metrics():
     with open(R / "metrics.csv", "w", newline="") as f:

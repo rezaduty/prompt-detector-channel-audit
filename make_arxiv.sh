@@ -48,7 +48,9 @@ done
 # resolved from the local TeX tree rather than the tarball is caught here.
 TMP=$(mktemp -d)
 cp -R "$OUT"/. "$TMP"/
+# Three passes: with many floats the labels need a third pass to settle.
 ( cd "$TMP" && pdflatex -interaction=nonstopmode Paper.tex >/dev/null 2>&1 \
+            && pdflatex -interaction=nonstopmode Paper.tex >/dev/null 2>&1 \
             && pdflatex -interaction=nonstopmode Paper.tex >/dev/null 2>&1 )
 if [ ! -f "$TMP/Paper.pdf" ]; then
   echo "clean-room build FAILED, tarball not written" >&2
@@ -58,8 +60,14 @@ if [ ! -f "$TMP/Paper.pdf" ]; then
 fi
 PAGES=$(grep -oE 'Output written on Paper\.pdf \([0-9]+ pages' "$TMP/Paper.log" \
         | grep -oE '[0-9]+' | head -1)
-UNDEF=$(grep -ciE 'Warning.*(undefined|Citation|Reference)' "$TMP/Paper.log" || true)
+# Only warnings that mean something is undefined. "Label(s) may have changed"
+# mentions cross-references too but is not a missing reference.
+UNDEF=$(grep -ciE 'Warning: (Reference|Citation) .* undefined|There were undefined references' "$TMP/Paper.log" || true)
 rm -rf "$TMP"
+if [ "$UNDEF" != "0" ]; then
+  echo "clean-room build has $UNDEF undefined references, tarball not written" >&2
+  exit 1
+fi
 
 # The tarball must not carry the built PDF or any aux file.
 ( cd ../arxiv_uploads && tar --disable-copyfile \

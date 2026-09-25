@@ -1,4 +1,4 @@
-# Calibration Limits of Weighted Rule Signals and Taxonomy Label Inflation in Guard Model Classification of Prompt Injection
+# False Positives of Prompt-Injection Detectors on Instruction-Shaped Benign Text: A Comparative Evaluation Across Seven Detectors
 
 Measurement artifact for the paper of the same name. Everything reported in the
 paper is reproduced from this repository, and a fail-closed verifier re-derives
@@ -39,12 +39,13 @@ determine what question each output actually answers.
 
     src/
       build_probes.py    regenerates the probe set from literals
-      run_experiment.py  the eight measurement phases
+      run_experiment.py  the measurement phases
       analyze.py         metrics, LaTeX macros, tables
       verify_numbers.py  fail-closed verifier
       make_figures.py    data charts and the span figure
       check_figures.py   diagram geometry and figure/data agreement
 
+    data/external/       NotInject and real corpora, frozen with revisions
     results/             raw CSVs, all 546 guard calls, captured configuration
     paper/               IEEEtran LaTeX, generated macros and tables, figures
 
@@ -60,6 +61,12 @@ determine what question each output actually answers.
 | P6 | carrier variation, does the filename change what is seen | 455 cells |
 | P7 | per-sentence analysis, tags and spans | 111 sentences |
 | P8 | external validation on a third-party corpus | 116 items |
+| P9, P10 | NotInject over-defense benchmark, layered detector and guards | 339 prompts |
+| P11 | real role prompts and prompt-injection abstracts | 200 prompts, 61 abstracts |
+
+The seven-detector comparison scores every probe and corpus with four
+published classifiers and two language-model guards. Raw verdicts are in
+`results/panel/`, frozen corpora with revisions in `data/external/`.
 
 ## Running it
 
@@ -68,7 +75,7 @@ documentation is at `/docs`, with `/redoc` and `/openapi.json` alongside.
 
     pip install -r requirements.txt
     python3 src/build_probes.py       # regenerate data/probes/probes.jsonl
-    python3 src/run_experiment.py     # all eight phases
+    python3 src/run_experiment.py     # every phase
     ./build.sh                        # analyze, verify, figures, PDF
 
 Individual phases: `python3 src/run_experiment.py 1 8`.

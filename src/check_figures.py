@@ -235,11 +235,31 @@ def check_span_figure():
     print(f"  fig_spans: {len(texts)} worked examples, chips match baseline.csv")
 
 
+def check_panel_figure():
+    """The panel chart's plotted counts must equal the macros the table uses."""
+    import json as _json
+    src = FIGURES / "fig_panel.json"
+    if not src.exists():
+        FAILURES.append("fig_panel: plotted values missing")
+        return
+    mac = dict(re.findall(r"\\newcommand\{\\([A-Za-z]+)\}\{([^}]*)\}",
+                          pathlib.Path("paper/tables/macros.tex").read_text()))
+    bad = 0
+    for key, (k, n) in _json.loads(src.read_text()).items():
+        d, g = key.split("|")
+        if str(k) != mac.get(f"Pan{d}{g}K") or str(n) != mac.get(f"Pan{d}{g}N"):
+            FAILURES.append(f"fig_panel: {key} plots {k}/{n} but the macros say "
+                            f"{mac.get(f'Pan{d}{g}K')}/{mac.get(f'Pan{d}{g}N')}")
+            bad += 1
+    print(f"  fig_panel: {len(_json.loads(src.read_text()))} bars match the macros" if not bad else "")
+
+
 def main():
     print("Checking concept diagram geometry")
     for name in sorted(RENDER_WIDTH_IN):
         check_figure(name)
     check_span_figure()
+    check_panel_figure()
     if FAILURES:
         print(f"FIGURE CHECK FAILED: {len(FAILURES)} problem(s)")
         for f in FAILURES:

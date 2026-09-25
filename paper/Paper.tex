@@ -26,8 +26,8 @@
 
 \begin{document}
 
-\title{Calibration Limits of Weighted Rule Signals and Taxonomy Label Inflation
-in Guard Model Classification of Prompt Injection}
+\title{False Positives of Prompt-Injection Detectors on Instruction-Shaped Benign
+Text: A Comparative Evaluation Across Seven Detectors}
 
 \author{
 \IEEEauthorblockN{Mohammadreza Rashidi~\orcidlink{0009-0003-7136-7168}}
@@ -40,121 +40,84 @@ mohammadreza.rashidi@ue-germany.de}
 \maketitle
 
 \begin{abstract}
-Layered prompt injection detectors combine a weighted rule scorer with a
-guard-model classifier, and expose both to operators through a single
-confidence band and a category label. We measure what each layer actually
-decides in a deployed detector, using its own configuration interface. Our probe set of \NProbes{} labelled inputs
-crosses two ground-truth axes, the taxonomy label and whether the text is
-prompt shaped. On it, the weighted score separates prompt-shaped text from
-ordinary text at an area under the curve of \AurocScorePrompt{}\%, but
-separates attacks from benign traffic at \AurocScoreAttack{}\%, below chance,
-because benign prompts score higher than injections. Only \NSignalsFiring{} of \NSignalsTotal{} weighted signals ever
-fire on conversational input, leaving \NSignalsInert{} weights unidentifiable
-from this traffic. A random search over \NSearchConfigs{} weight vectors
-spanning the joint weight space, \NSearchCells{} scored cells, reaches a best
-area under the curve of \SearchBestAuroc{}\% and never exceeds chance, so the
-calibration knob the interface offers cannot convert this channel into an
-injection detector. The rule channel that does target injection matches fixed
-attack phrases and flags \FlagTprAttack{}\% of attacks against
-\FlagFprSafe{}\% of benign inputs, a difference that is not significant
-(Fisher exact, $p=\FlagFisherP{}$). Of the \NFlagSafe{} benign inputs it
-flags, \NKipSafe{} come from its injection-phrase rule, and \NKipDoc{} of
-those are security documentation that quotes attack vocabulary. The
-guard models separate attacks from benign traffic, at
-\BinTprZs{}\% and \BinTprTr{}\% recall, but their category labels do not
-survive. Neither model assigns the jailbreak code to any jailbreak probe, and
-the trained model relabels \SsixAsSfiveTr{}\% of them as injection. The
-zero-shot model also emits degenerate verdicts listing most of the taxonomy on
-\NDegenZs{} probes, inflating its apparent injection recall from
-\CatTprSfiveStrictZs{}\% to \CatTprSfiveZs{}\%. The collapse is not a supervision
-gap: the trained model carries \NTrainSsixTr{} jailbreak rows in its training
-set. Training raises attack recall and moves the errors onto benign
-instruction-shaped text: the trained guard flags \BinFprLegitTr{}\% of
-legitimate system prompts as injection, and on an external corpus marks
-\ExtBinFprTr{}\% of benign items unsafe against \ExtBinFprZs{}\% for the
-zero-shot model ($p=\ExtBenignFisherP{}$), because the feature that
-distinguishes an authorised instruction from an injected one is provenance,
-which no text classifier receives. That model's own recorded evaluation
-reports a binary $F_1$ of \ReportedFOneTr{}, computed on a held-out split of
-the same \NTrainTotalTr{}-row mostly synthetic pool it was trained on and
-containing no hard negatives, against the \BinFprTr{}\% benign false-positive
-rate we measure. Adding three rules for declarative and indirect phrasing
-raises flag-channel attack coverage from \FlagTprAttack{}\% to
-\DefTprAttack{}\% with \DefGainedFp{} new false positives, which bounds what
-rule extension buys and what it leaves in place.
+Prompt-injection detectors are trained and scored on attacks and ordinary
+requests. Deployed, they also see benign text that is itself shaped like an
+instruction: system prompts, role prompts, and documentation that quotes
+attack phrases. We compare \NDetectorsCompared{} detectors on such text: four
+published classifiers, a language-model detector at two model sizes, and a
+layered detector built from weighted rules and guard models. On
+\PanDeepsetRealPromptN{} real community role prompts, two published
+classifiers flag \PanDeepsetRealPromptK{} and \PanFmopsRealPromptK{}. On
+\PanDeepsetRealDocN{} real security abstracts, PIGuard, a classifier trained
+against over-defense, flags \PanPiguardRealDocK{}, and only the language-model
+detector flags none. The over-defense benchmark NotInject ranks the detectors
+in a similar order but misstates the level for \NPanDocHigher{} of
+\NPanRanked{} detector outputs, which flag documentation significantly more
+often than NotInject prompts. The layered detector adds a second failure.
+Its weighted score measures whether text is shaped like a prompt, and no
+setting of its weights separates attacks from benign traffic. Every number is
+re-derived by an independent verifier.
 \end{abstract}
 
 \begin{IEEEkeywords}
-prompt injection, guard models, detection calibration, rule-based scanning,
-false positives, safety taxonomies, OWASP LLM01
+prompt injection, guardrails, over-defense, false positives, detector
+evaluation
 \end{IEEEkeywords}
 
 % ============================================================
 \section{Introduction}\label{sec:intro}
 
-Prompt injection is the first entry, LLM01, of the Open Worldwide Application
-Security Project (OWASP) Top 10 for Large Language Model (LLM) Applications in
-both the 2025 and 2026 editions~\cite{owasp2025, owasp2026}, and is catalogued
-by the MITRE Adversarial Threat Landscape for Artificial-Intelligence Systems
-(ATLAS) as technique Adversarial Machine Learning AML.T0051~\cite{mitre_atlas}. The 2026 edition states the structural reason no
-input filter resolves it: language models draw no architectural boundary
-between instructions and data, so defence is architectural rather than
-interceptive, and detection controls are expected to degrade against adaptive
-attackers~\cite{owasp2026}. That guidance is about the ceiling of detection.
-This paper is about the floor. Before asking how well a deployed detector
-resists an adaptive attacker, there is a prior question: what its output
-answers on traffic that is not adversarially tuned at all.
+Prompt injection is the first entry, LLM01, of the OWASP Top 10 for Large
+Language Model Applications~\cite{owasp2025, owasp2026}, and detection is one
+of the controls that entry lists and marks as incomplete. A detector sits in
+front of a model and decides whether a text tries to redirect it. It is
+trained and scored on two kinds of text: attacks, and ordinary requests.
 
-Production guardrail stacks are built from several detectors at once, which
-the OWASP 2026 entry states as a requirement rather than a
-convention, since no single control is sufficient against prompt
-injection~\cite{owasp2026}. NeMo Guardrails~\cite{rebedea2023nemo,
-nemo_guardrails_repo} composes programmable rails, and guard models such as
-Llama Guard~\cite{inan2023llamaguard} classify an input against a written
-policy and return category codes. Layering a deterministic rule scorer under
-such a classifier follows the same defence-in-depth
-argument~\cite{owasp2026, nist_aiml_2025}, and presents both to an operator
-through one interface: a confidence band, a list of risk flags, and a taxonomy
-code. In the system measured here the rule scorer carries operator-editable
-integer weights (Appendix~\ref{app:signals}), which invites one obvious
-response to a missed detection: raise the weights.
+A deployed detector sees a third kind. Agent frameworks and retrieval
+pipelines pass system prompts, prompt templates, tool descriptions and
+security documentation through the same input filters as user traffic. That
+text is benign and instruction shaped. A system prompt tells a model what to
+do, and a page explaining prompt injection quotes the phrases attacks use. A
+detector that keys on the shape of an instruction, or on attack vocabulary,
+will block it.
 
-We tested whether that response works, on a deployed detector that exposes its
-scoring weights, thresholds, and rule patterns through a configuration
-application programming interface (API), and that serves two guard models over the same taxonomy. The
-detector is described in Section~\ref{sec:system} and its interface in
-Appendix~\ref{app:api}. Our measurement rests on a design choice: the probe set
-carries two independent ground-truth axes, the taxonomy label and whether the
-text is \emph{prompt shaped}. A legitimate system prompt is prompt shaped and
-benign. An injection delivered in a chat turn is an attack and is not prompt
-shaped. Without both axes the two rule channels cannot be told apart, because
-a probe set of attacks and ordinary questions confounds them.
+InjecGuard named the vocabulary half of this problem over-defense and built
+NotInject, a benchmark of benign prompts that carry trigger words, together
+with PIGuard, a classifier trained to avoid it~\cite{li2024injecguard}. We
+ask the broader question: how do current detectors treat benign text whose
+shape, not only whose vocabulary, resembles an attack, and does a detector's
+over-defense on NotInject predict its behaviour on that text?
+
+We answer it on a probe set that crosses the two ground-truth axes, whether a
+text is an attack and whether it is shaped like a prompt, with three groups
+of hard negatives: legitimate system prompts, security documentation that
+quotes attack phrases, and templates. We run \NDetectorsCompared{} detectors
+on it and on the public corpora, NotInject and the deepset prompt-injection test split.
+One of them is a layered detector built for this study from weighted
+rules and two guard models. Its configuration interface lets us ask a
+question the published detectors do not allow: whether any setting of its
+weights would fix what it gets wrong.
 
 \subsection{Contributions}
 
 \begin{itemize}
-\item A probe set of \NProbes{} inputs (Section~\ref{sec:dataset}) crossing the
-  taxonomy label with prompt-shapedness, including \NHardNeg{} hard negatives
-  in three groups: legitimate system prompts, benign security documentation
-  that quotes attack vocabulary, and benign templates with unfenced
-  placeholders.
-\item A channel separation result (Section~\ref{sec:channels}): the weighted
-  score answers whether text is a prompt, not whether it is an attack, and the
-  two questions anticorrelate on this traffic.
-\item A calibration limit (Section~\ref{sec:calibration}) established by
-  sweeping each weight across its full range and then searching the joint
-  weight space at \NSearchConfigs{} points, with the best reachable separation
-  reported against the flag-everything baseline.
-\item A guard-model label audit (Section~\ref{sec:guard}) separating the
-  binary verdict, which holds, from the category label, which collapses, and
-  quantifying how degenerate multi-code verdicts inflate apparent per-category
-  recall.
-\item A rule-extension evaluation (Section~\ref{sec:defense}) that adds
-  patterns for declarative and indirect phrasing through the same interface an
-  operator would use, and measures both what it recovers and what it does not.
-\item A fail-closed verifier (Section~\ref{sec:verify}, Appendix~\ref{app:verify})
-  that recomputes every number in this paper from the raw result files with
-  independent code and refuses to pass on disagreement.
+\item A comparison of \NDetectorsCompared{} detectors on instruction-shaped benign text,
+  on real role prompts and security abstracts, our probe set, and two public
+  corpora (Section~\ref{sec:comparison}).
+\item A comparison of two over-defense benchmarks: NotInject ranks the
+  detectors like real security documentation does but misstates their level
+  for most of them (Section~\ref{sec:disagree}).
+\item A configuration-level audit of a layered detector: its weighted score
+  measures prompt shape, and a search over its joint weight space never
+  separates attacks from benign traffic (Sections~\ref{sec:channels}
+  and~\ref{sec:calibration}).
+\item An audit of the layered detector's guard models: the binary verdict
+  holds and the category label does not, and the trained model's recorded
+  evaluation hides its false positives (Sections~\ref{sec:guard}
+  and~\ref{sec:evalgap}).
+\item A probe set with a datasheet and a fail-closed verifier that re-derives
+  every number from raw outputs (Sections~\ref{sec:dataset}
+  and~\ref{sec:verify}).
 \end{itemize}
 
 % ============================================================
@@ -169,7 +132,7 @@ integrations, and Liu et al.~\cite{liu2024formalizing} gave a formal framework
 and benchmark. Wei et al.~\cite{wei2023jailbroken} separated jailbreak from
 injection by mechanism, competing objectives and mismatched generalisation,
 which is the distinction the S5 and S6 codes attempt to encode and which
-Section~\ref{sec:guard} finds does not survive in the deployed classifier. Zou
+Section~\ref{sec:guard} finds does not survive in the layered detector's classifier. Zou
 et al.~\cite{zou2023universal} optimised suffixes directly against model
 gradients. Willison~\cite{willison2023injection, willison2025trifecta} framed
 the deployment-level consequence that the OWASP 2026 entry
@@ -191,6 +154,22 @@ target model does once a payload reaches it. We evaluate the detector in
 isolation instead, which is a narrower question and one those harnesses do not
 separate out.
 
+\subsection{Published detectors and over-defense}
+Classifier detectors fine-tune an encoder on labelled injections and benign
+prompts. The Protect AI DeBERTa model~\cite{protectai2024deberta}, the deepset
+DeBERTa model trained on the deepset prompt-injection
+dataset~\cite{deepset2023injection, deepset_promptinjections} and a DistilBERT
+classifier~\cite{fmops2023distilbert} are widely downloaded examples. A second
+family prompts a language model to judge the text, as
+PromptArmor does~\cite{shi2025promptarmor}. InjecGuard showed that classifier
+detectors over-defend: they flag benign prompts that contain trigger words
+such as \emph{ignore}, and it released NotInject to measure this and PIGuard,
+a classifier trained to reduce it~\cite{li2024injecguard, piguard2025model}.
+NotInject places trigger words inside ordinary requests. Our hard negatives
+test two further kinds of benign text, instructions that are legitimate
+because of who wrote them and documentation that quotes the phrases, and we
+compare detectors on both benchmarks.
+
 \subsection{Detection evaluation}
 The false-positive behaviour we report is an instance of a known problem.
 Axelsson~\cite{axelsson2000baserate} showed that at realistic base rates
@@ -209,68 +188,23 @@ budget in comparable settings~\cite{bergstra2012random}.
 
 \subsection{What is new in this paper}\label{sec:novelty}
 
-Existing evaluations treat a detector as a black box and score it on an attack
-corpus, which answers how often it fires. We treat the detector as a
-configurable system and ask which question each of its outputs decides, which
-requires a different instrument. Eight things in this paper do not appear in the
-work surveyed in this section.
-
-\emph{Parameter identifiability as a detector property.} We ask which of a
-detector's tunable weights can be estimated from the traffic it sees at all,
-which is the standard identifiability question in statistical
-modelling~\cite{hastie2009elements} and, to our knowledge, has not been applied
-to a deployed guardrail. It separates a weight that is set badly from one that
-cannot be set at all, and Section~\ref{sec:channels} finds
-\NSignalsInert{} of \NSignalsTotal{} weights that cannot be set at all.
-
-\emph{Exhausting the reachable configuration space.} Rather than evaluating the
-shipped weights, we sample the joint weight space
-(Section~\ref{sec:calibration}) and report the best result any configuration
-achieves. This converts a statement about one setting into a statement about
-the control itself, which is what an operator needs before spending effort
-tuning.
-
-\emph{A second ground-truth axis.} Labelling each probe both by taxonomy
-category and by whether it is prompt shaped is what makes channel attribution
-possible. Attack corpora alone cannot distinguish a channel that detects
-attacks from one that detects instruction-shaped text, because in those corpora
-the two coincide.
-
-\emph{Degenerate verdicts as a measurement artifact.} We show that counting
-per-category recall naively over multi-code verdicts overstates a guard model's
-category performance by \CatInflationSfiveZs{} points
-(Section~\ref{sec:guard}). This is a caution for anyone benchmarking policy
-classifiers, and it is a scoring-rule effect rather than a property of any
-model.
-
-\emph{The reported metric against the measured one.} Section~\ref{sec:evalgap}
-compares a guard model's own recorded evaluation against an independent probe
-set containing hard negatives, and finds a recorded binary $F_1$ of
-\ReportedFOneTr{} alongside a \BinFprTr{}\% benign false-positive rate. The
-gap is structural, since the recorded figure is computed on a split of a small
-mostly synthetic pool that contains no hard negatives.
-
-\emph{Reading the detector's own sentence decomposition.}
-Section~\ref{sec:tags} tests each linguistic tag the detector assigns as a
-detector in its own right. The tag it treats as its risk signal does not
-separate attacks from benign text, and the two significant tags that do point
-at benign text rather than at attacks. Worked span-level examples
-(Fig.~\ref{fig:spans}) show why: an attack and a sentence of documentation
-about that attack match on the same string.
-
-\emph{A confound in the benchmark, found by disagreement.}
-Section~\ref{sec:confound} uses the disagreement between our probe set and a
-public corpus as a diagnostic rather than treating either as ground truth. On
-the public corpus the salience score scores above chance, but length alone
-scores higher still and stratifying by length removes the effect, so the
-apparent skill is a shortcut~\cite{geirhos2020shortcut}. We are not aware of
-this being reported for a prompt injection benchmark.
-
-\emph{Supervision without expression.} Section~\ref{sec:s6gap} shows a
-category that is defined in the policy, demonstrated in the classifier prompt,
-and supervised with \NTrainSsixTr{} training rows, yet never appears in the
-served output. Taxonomy coverage claimed from a policy or a training mix is
-therefore not evidence about the deployed classifier.
+\begin{itemize}
+\item \emph{Instruction-shaped hard negatives across detectors.} Legitimate
+  system prompts and security documentation are scored by \NDetectorsCompared{}
+  detectors on the same probes, next to NotInject. Prior over-defense work
+  measures trigger words in ordinary requests only.
+\item \emph{Two over-defense benchmarks compared.} NotInject ranks detectors
+  like real security documentation does but misstates the level for most of
+  them, because the two put the trigger phrase in different kinds of benign
+  text.
+\item \emph{The reachable configuration space of a layered detector.} Instead of
+  scoring one setting, a search over the detector's joint weight space bounds
+  what any setting can achieve, which separates a weight that is set badly
+  from a channel that measures the wrong property.
+\item \emph{Category labels and recorded metrics of guard models.} The binary
+  verdict and the category label are scored separately, and a guard's recorded
+  evaluation is compared with the same guard on hard negatives.
+\end{itemize}
 
 % ============================================================
 \section{Threat Model and Scope}\label{sec:threat}
@@ -286,11 +220,11 @@ evadable~\cite{owasp2026}.
 We measure the detector only, not downstream model behaviour. Whether a given
 payload would in fact redirect a target model is a separate question studied
 elsewhere~\cite{perez2022ignore, liu2024formalizing}. The probes are labelled
-by the taxonomy the deployed classifier is written against, which is
+by the taxonomy the layered detector's guard models are written against, which is
 reproduced verbatim in Appendix~\ref{app:taxonomy}.
 
 Our adversary is non-adaptive: the payloads are written from published attack
-phrasings, not optimised against the deployed detector. This is deliberate and
+phrasings, not optimised against any detector. This is deliberate and
 it bounds our claims. Adaptive attackers defeat detectors that look strong
 under static evaluation~\cite{nasr2025adaptive, owasp2026}, a position the
 National Institute of Standards and Technology (NIST) adversarial machine
@@ -298,15 +232,46 @@ learning taxonomy also takes~\cite{nist_aiml_2025}. A detector that fails on
 non-adaptive traffic therefore fails a necessary condition, and one that passes
 has not been shown to be adequate.
 
-Everything reported here runs against a detector on the author's own machine,
-using benign canary-style payloads. The declarative probes assert that a
+Every detector runs on the author's own machine, and every probe carries a
+benign canary-style payload. The declarative probes assert that a
 policy permits disclosure. None carry harmful content, and no third-party
 service was exercised.
 
 % ============================================================
-\section{System Under Measurement}\label{sec:system}
+\section{Detectors Under Test}\label{sec:detectors}
 
-The detector exposes three outputs for one input, illustrated in
+All detectors but one are published or built from published components,
+and each is pinned to one model revision (Appendix~\ref{app:models}).
+
+\begin{itemize}
+\item \emph{ProtectAI DeBERTa v2}~\cite{protectai2024deberta}, a DeBERTa
+  classifier widely used as an input filter.
+\item \emph{PIGuard}~\cite{li2024injecguard, piguard2025model}, a classifier
+  trained to reduce over-defense.
+\item \emph{deepset DeBERTa}~\cite{deepset2023injection}, trained on the
+  deepset prompt-injection dataset whose test split we also score.
+\item \emph{DistilBERT}~\cite{fmops2023distilbert}, a smaller encoder
+  classifier.
+\item \emph{A language-model detector} prompted to answer INJECTION or SAFE,
+  in the style of PromptArmor~\cite{shi2025promptarmor}, run on two models
+  of one family, \texttt{qwen/qwen3.5-9b} and \texttt{qwen/qwen3.8-27b}, with
+  the same prompt.
+\end{itemize}
+
+The last is a layered detector built by the author on NeMo
+Guardrails~\cite{rebedea2023nemo, nemo_guardrails_repo} as a reference
+implementation of the pattern Section~\ref{sec:intro} describes: a weighted
+rule scorer, pattern flags, and two guard models, behind one configuration
+interface. It is not a third-party product. We include it because its
+interface exposes every weight and threshold, so its failures can be traced
+to a setting or shown to survive every setting, which a published detector
+does not allow. Section~\ref{sec:system} describes it.
+
+% ============================================================
+\section{The Layered Detector}\label{sec:system}
+
+
+The layered detector exposes three outputs for one input, illustrated in
 Fig.~\ref{fig:channels}.
 
 \textbf{Salience score and band.} A weighted sum over \NSignalsTotal{} named
@@ -431,7 +396,12 @@ ground-truth axis and is independent of the label.}
 % ============================================================
 \section{Protocol}\label{sec:protocol}
 
-Fig.~\ref{fig:protocol} summarises the six phases. All run against the live
+The comparison of Sections~\ref{sec:comparison} and~\ref{sec:disagree}
+scores every detector once on every probe, on the \NNotInjectItems{} NotInject
+prompts and on the deepset test split, with each verdict and its raw output
+logged. The published classifiers and the language-model detector run
+locally at pinned revisions. The layered detector is additionally measured in
+the phases of Fig.~\ref{fig:protocol}. All run against the live
 service over its configuration interface (Appendix~\ref{app:api}).
 
 \textbf{P1, baseline.} Every probe is scored at the shipped configuration, and
@@ -494,7 +464,93 @@ positive, because that trivial rule scores $F_1=\SearchTrivialFO{}\%$ at this
 attack base rate and any figure at or below it carries no discrimination.
 
 % ============================================================
-\section{Results: What Each Channel Decides}\label{sec:channels}
+\section{Results: Most Detectors Flag Instruction-Shaped Benign Text}\label{sec:comparison}
+
+Table~\ref{tab:panel} scores every detector output on the same inputs. On
+attacks, most detectors are strong. On benign text shaped like an
+instruction they split, and the real corpora show it at a scale the probe set
+cannot (Fig.~\ref{fig:panel}). Of \PanDeepsetRealPromptN{} community role
+prompts, text people wrote to instruct a model, the deepset classifier flags
+\PanDeepsetRealPromptK{} and the DistilBERT classifier \PanFmopsRealPromptK{}.
+The layered detector's flag rules flag \PanBenchflagRealPromptK{}, its trained
+guard \PanBenchtrRealPromptK{}, PIGuard \PanPiguardRealPromptK{}, the smaller
+language-model detector \PanLlmRealPromptK{} and the ProtectAI classifier
+\PanProtectaiRealPromptK{}. Of \PanDeepsetRealDocN{} arXiv abstracts about
+prompt injection, which describe attacks and quote their phrasing, the deepset
+and DistilBERT classifiers flag all, PIGuard \PanPiguardRealDocK{} and the
+layered detector's zero-shot guard \PanBenchzsRealDocK{}. Neither
+language-model detector flags any (\PanLlmRealDocK{} and
+\PanLlmtwosevenRealDocK{}), because the prompt asks whether the text tries to
+redirect the model, and an abstract about an attack does not.
+
+The probe set's hand-written hard negatives agree. Pooling its legitimate
+system prompts, security documents and templates, the DistilBERT classifier
+flags \PanFmopsShapedK{} of \PanFmopsShapedN{} and the deepset classifier
+\PanDeepsetShapedK{}, against \PanPiguardShapedK{} for PIGuard (Fisher exact,
+$p\,\PanShapedPiguardVsDeepsetP{}$) and \PanLlmShapedK{} for the smaller
+language-model detector.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_panel.pdf}
+\caption{Share of real role prompts, real security abstracts and NotInject
+prompts each detector output flags, with Wilson intervals. A detector whose
+NotInject bar and documentation bar differ is the disagreement of
+Section~\ref{sec:disagree}.}
+\label{fig:panel}
+\end{figure*}
+
+\begin{table*}[t]
+\centering
+\caption{Every detector output on the probe set, NotInject and the deepset
+test split, as flagged over group size. The layered detector's weighted
+score flags nothing at its shipped band threshold
+(Section~\ref{sec:channels}). The layered detector's guard models were scored
+on NotInject after the other detectors, in a separate phase.}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\input{tables/tab_panel.tex}
+\label{tab:panel}
+\end{table*}
+
+\section{Results: NotInject Ranks the Detectors but Misstates Their Over-Defense on Documentation}\label{sec:disagree}
+
+NotInject is the published benchmark for this failure, and a detector's rate
+on it is the obvious summary. Across the \NPanRanked{} detector outputs that
+flag anything, NotInject and the security abstracts rank the detectors in a
+similar order (Spearman $\rho=\PanNiDocRho{}$, $p=\PanNiDocRhoP{}$): the two
+classifiers that flag most text lead on both and the language-model detector
+trails on both. The level does not transfer. \NPanDocHigher{} of the
+\NPanRanked{} outputs flag documentation significantly more often than
+NotInject prompts and \NPanDocLower{} significantly less (Fisher exact,
+Bonferroni-corrected over the \NPanCompared{} outputs). PIGuard flags \PanPiguardNotInjectK{} of
+\PanPiguardNotInjectN{} NotInject prompts and \PanPiguardRealDocK{} of
+\PanPiguardRealDocN{} security abstracts ($p\,\PanPiguardNiVsRealDocP{}$). The
+ProtectAI classifier shows the opposite profile, \PanProtectaiNotInjectK{}
+NotInject prompts and \PanProtectaiRealDocK{} abstracts
+($p\,\PanProtectaiNiVsRealDocP{}$). The layered detector's flag rules flag
+\PanBenchflagNotInjectK{} NotInject prompts and \PanBenchflagRealDocK{}
+abstracts.
+
+The reason is where each benchmark puts the phrase. NotInject places trigger
+words such as \emph{ignore} inside ordinary requests, where they carry their
+ordinary meaning. Documentation about attacks quotes whole attack phrases,
+such as \emph{ignore previous instructions}, and discusses them in the
+vocabulary a detector learned from attacks. A detector that has been
+evaluated for over-defense on one kind of benign text has not been evaluated
+on the other.
+
+The public deepset split agrees with neither. Every published detector flags
+at most one of its \PanProtectaiDsBenN{} benign items, while the layered
+detector's guard models flag \PanBenchzsDsBenK{} and \PanBenchtrDsBenK{}
+(Section~\ref{sec:external}). Its deepset score is also not independent for
+one detector: the deepset classifier was trained on the same dataset and
+detects \PanDeepsetDsAtkK{} of \PanDeepsetDsAtkN{} of its test attacks.
+
+The remaining results examine the layered detector, whose interface lets us
+ask why its outputs fail and whether any setting would fix them.
+
+\section{Results: The Layered Detector's Weighted Score Measures Prompt Shape}\label{sec:channels}
 
 Table~\ref{tab:channels} gives the four detectors side by side.
 
@@ -518,7 +574,7 @@ watching the band sees nothing at all on this traffic.
 The scores themselves are more informative, and they point the wrong way. Mean
 score is \MeanScoreSfive{} on injection probes and \MeanScoreSafe{} on benign
 probes. Separation of attacks from benign traffic is
-\AurocScoreAttack{}\%, below the 50 percent chance line, meaning a
+\AurocScoreAttack{}\%, below the chance line, meaning a
 randomly drawn benign probe outscores a randomly drawn attack more often than
 not. Separation of prompt-shaped from ordinary text, over the same scores, is
 \AurocScorePrompt{}\%. The channel is not broken. It answers a different
@@ -613,94 +669,7 @@ across all five.}
 \end{figure*}
 
 % ============================================================
-\section{Results: Sentence Level Analysis}\label{sec:sentences}
-
-The channel results so far are aggregates. This section reads the detector's
-own per-sentence output, which reports for each sentence a set of linguistic
-tags, the spans that produced them, and a risk verdict. Across the probe set it
-segments \NProbes{} probes into \NSentences{} sentences.
-
-\subsection{Worked examples}\label{sec:worked}
-
-Fig.~\ref{fig:spans} shows what the detector matches, span by span, on eight
-probes, with the verdict each channel returned. The rows are arranged so that
-an attack sits directly above benign text that matches on the same span.
-
-The first pair is the clearest case. The imperative attack and a sentence of
-security documentation about that attack both match the injection-phrase
-pattern on almost identical text, one because it issues the instruction and
-one because it quotes it. Both are marked risky, both are flagged, and both are
-called unsafe by the guard. Nothing downstream of the match can separate them,
-because the matched span is the same string.
-
-The second pair repeats this for the phrase \texttt{system prompt}. It is
-matched inside a declarative attack, and matched again inside a benign
-assignment to a variable named \texttt{system\_prompt}. The third pair shows a
-benign request to summarise a paper on jailbreak taxonomies, flagged because
-the word appears in the pattern list.
-
-The last two rows are the cases the sentence channel gets right. A legitimate
-system prompt tagged only as a directive, and a benign template tagged only as
-a placeholder, are both left unmarked.
-
-\begin{figure*}[t]
-\centering
-\includegraphics[width=\textwidth]{figures/fig_spans.pdf}
-\caption{Per-span analysis on eight probes. Coloured spans are the matches the
-detector reports, with the tag it assigned. The chips give the verdict from
-the sentence channel, the risk-flag rules, and the trained guard. The first
-three pairs place an attack above benign text that matches the same span.}
-\label{fig:spans}
-\end{figure*}
-
-\subsection{The sentence channel repeats the flag channel}
-
-Aggregated, the sentence channel behaves like the rule channel it shares
-vocabulary with. It marks \SentTprAttack{}\% of attack probes and
-\SentFprSafe{}\% of benign probes, and it marks \SentFprDoc{}\% of the
-security-documentation group, the same total failure on that group the
-injection-phrase rule shows. By phrasing it falls from \SentRateImp{}\% on
-imperative attacks to \SentRateDec{}\% on declarative, again matching the rule
-channel.
-
-\subsection{Two tags point the wrong way}\label{sec:tags}
-
-The sentence channel assigns richer tags than the flag channel, so it is worth
-asking whether any tag separates attacks from benign text.
-Table~\ref{tab:tags} tests each one.
-
-The injection-phrase tag, the one the detector treats as its risk signal, does
-not separate the two groups ($p=\TagPInjectionPhrase{}$). Three tags do reach
-significance, and two of them point at benign text rather than at attacks.
-The directive tag appears on \TagBenDirective{}\% of benign probes against
-\TagAtkDirective{}\% of attacks ($p=\TagPDirective{}$), because ordinary
-requests and legitimate system prompts are written as directives while
-declarative injections are not. The placeholder tag appears only on benign
-probes ($p=\TagPPlaceholder{}$). The neutral tag, which marks a sentence
-carrying no linguistic signal at all, is the one tag that favours attacks,
-at \TagAtkNeutral{}\% against \TagBenNeutral{}\% ($p=\TagPNeutral{}$),
-because a declarative injection reads as a plain statement of fact.
-
-\begin{table}[t]
-\centering
-\caption{Sentence tags as detectors. Direction names the class the tag is more
-common in. The tag the detector treats as its risk signal does not separate
-the classes, and the two significant tags that do point at benign text.}
-\label{tab:tags}
-\footnotesize
-\input{tables/tab_tags.tex}
-\end{table}
-
-This is the channel-level result of Section~\ref{sec:channels} restated at the
-level of individual sentences. The features available to the detector are
-correlated with instruction-shaped and template-shaped writing, which benign
-production text contains more of than attacks do. A detector built on them
-inherits that correlation whatever weight it assigns, in the same way a
-classifier inherits any surface regularity that happens to track its
-label~\cite{geirhos2020shortcut, lapuschkin2019cleverhans}.
-
-% ============================================================
-\section{Results: The Calibration Limit}\label{sec:calibration}
+\section{Results: No Setting of the Layered Detector's Weights Separates Attacks}\label{sec:calibration}
 
 Section~\ref{sec:channels} shows the shipped weights do not make the score
 channel an injection detector. This section asks whether any weights do.
@@ -740,7 +709,7 @@ the full weight range.}
 \includegraphics[width=\textwidth]{figures/fig_signal_sweep.pdf}
 \caption{Separation as a function of weight, for the signals whose weight
 changes any score. The remaining signals are omitted because their curves are
-flat by construction.}
+flat by construction (Section~\ref{sec:calibration}).}
 \label{fig:sweep}
 \end{figure*}
 
@@ -787,7 +756,7 @@ knob: it is well designed for the question the channel answers, and it is
 unrelated to the question the band label is read as answering.
 
 % ============================================================
-\section{Results: Guard Model Labels}\label{sec:guard}
+\section{Results: The Guard Models Keep the Binary Verdict and Lose the Category}\label{sec:guard}
 
 Table~\ref{tab:guard} summarises the two guards.
 
@@ -804,7 +773,7 @@ or more of the eight categories. Degenerate is the rate of those verdicts.}
 
 Both guards separate attacks from benign traffic where the rule channels do
 not. The zero-shot guard reaches \BinTprZs{}\% attack recall
-(95 percent Wilson interval \BinTprLoZs{}\% to \BinTprHiZs{}\%) at
+(\CiLevel{} percent Wilson interval \BinTprLoZs{}\% to \BinTprHiZs{}\%) at
 \BinFprZs{}\% false positives. The trained guard reaches \BinTprTr{}\%
 (\BinTprLoTr{}\% to \BinTprHiTr{}\%) at \BinFprTr{}\%. Verdicts are stable:
 across \NRepeats{} repeats of every probe, \NUnstableZs{} and \NUnstableTr{}
@@ -826,7 +795,7 @@ S6 recall is \CatTprSsixStrictZs{}\% for the zero-shot guard and
 \SsixAsSfiveTr{}\% of jailbreak probes as injection instead, and the zero-shot
 guard \SsixAsSfiveZs{}\%. The distinction between competing-objective
 jailbreaks and instruction override~\cite{wei2023jailbroken} is written into
-the deployed policy with a worked example for each, and it does not survive in
+the layered detector's policy with a worked example for each, and it does not survive in
 the output. An operator routing incidents by code would route every jailbreak
 into the injection queue.
 
@@ -843,13 +812,13 @@ A category can therefore be present in the policy, present with a worked
 example in the classifier prompt (Appendix~\ref{app:taxonomy}), and present in
 the training data, and still not appear in the output. Reporting a guard
 model's taxonomy coverage from its policy or its training mix overstates what
-the deployed classifier will actually emit, and only probing the served
+the layered detector's classifier will actually emit, and only probing the served
 endpoint shows it.
 
 \subsection{Degenerate verdicts inflate per-category recall}
 
-The deployed policy instructs the classifier to list only categories that
-clearly apply and never to list every category. The zero-shot guard violates
+The layered detector's policy instructs the classifier to list only the
+categories that ``clearly apply'' and never to list every category. The zero-shot guard violates
 this on \NDegenZs{} probes (\DegenZs{}\%), returning most of the eight codes at
 once (Fig.~\ref{fig:codes}). The trained guard does not
 (\NDegenTr{} probes).
@@ -955,7 +924,7 @@ detections. A deployment that takes either would inherit the flag channel's
 documentation false positives.
 
 % ============================================================
-\section{Results: The Reported Metric and the Measured One}\label{sec:evalgap}
+\section{Results: The Trained Guard's Recorded Metric Hides Its False Positives}\label{sec:evalgap}
 
 The trained guard ships with a recorded evaluation. The service reports a
 binary $F_1$ of \ReportedFOneTr{} on the model's held-out split. An operator
@@ -986,7 +955,7 @@ recall over the zero-shot guard is real and measured on the same probes, but it
 is not the advantage its recorded metric advertises.
 
 % ============================================================
-\section{Results: External Validation}\label{sec:external}
+\section{Results: The Layered Detector's Failures Transfer to the deepset Corpus}\label{sec:external}
 
 Every result so far rests on probes we wrote. This section replays the channel
 comparison on the test split of the deepset prompt-injections
@@ -1070,7 +1039,7 @@ earn, which is the measurement counterpart of the channel confusion this paper
 documents.
 
 % ============================================================
-\section{Results: Rule Extension}\label{sec:defense}
+\section{Results: Added Rules Recover Attacks and Keep the False Positives}\label{sec:defense}
 
 The flag channel's declarative gap is a coverage gap in a pattern list, so we
 tested whether extending the list closes it, using the same interface an
@@ -1149,10 +1118,22 @@ Appendix~\ref{app:verify}.
 
 \section{Limitations}\label{sec:limits}
 
-\textbf{One detector.} All results describe one deployed detector and its two
-guard backends. The channel-separation argument should generalise to any stack
-that layers a code-oriented prompt scanner under a content classifier, but the
-rates are specific to this system and these weights.
+\textbf{Detector coverage.} The comparison covers four published
+classifiers, one language-model detector prompt on two models of one family,
+and one layered detector built by the author. Meta's Prompt Guard models are
+gated and are not included, and a language-model detector from another family
+may behave differently. The layered detector's configuration results describe
+that detector, not the published ones, whose weights cannot be searched.
+
+\textbf{Training overlap is unknown.} Public prompt collections and
+injection datasets may be in the training data of some classifiers, whose
+training sets are only partly published. A detector that saw the role
+prompts as benign would score better on them than on unseen prompts.
+
+\textbf{In-distribution scores.} The deepset classifier was trained on the
+deepset prompt-injection dataset, so its score on that dataset's test split is
+not an independent measurement, and Section~\ref{sec:disagree} reads it that
+way.
 
 \textbf{Non-adaptive probes.} Payloads come from published phrasings and were
 not optimised against the detector. Every detection rate here is therefore an
@@ -1164,7 +1145,7 @@ rules.
 \textbf{Probe set size and provenance.} The \NProbes{} probes were written by
 the author from published attack phrasings and labelled by one annotator, so
 they carry no inter-annotator agreement figure and reflect one reading of the
-deployed taxonomy. Group sizes are small: the per-group rates in
+layered detector's taxonomy. Group sizes are small: the per-group rates in
 Table~\ref{tab:guard} rest on \NLegit{} and \NDoc{} probes each, and the
 Wilson intervals drawn in Fig.~\ref{fig:fp} and Fig.~\ref{fig:phrasing} are
 wide enough that per-group comparisons are directional unless a test is quoted.
@@ -1199,55 +1180,33 @@ The reported rate is a lower bound.
 % ============================================================
 \section{Conclusion}\label{sec:conclusion}
 
-A layered prompt injection detector can present three outputs through one
-interface while only one of them concerns injection. In the system measured
-here the weighted score separates prompt-shaped text at
-\AurocScorePrompt{}\% and attacks at \AurocScoreAttack{}\%, below chance. No
-point in its reachable configuration space changes that. \NSearchConfigs{}
-sampled weight vectors peak at \SearchBestAuroc{}\%, and
-\NSignalsInert{} of \NSignalsTotal{} weights cannot be calibrated from
-conversational traffic at all, because their signals never fire on it.
-Calibration is the wrong instrument for this gap, not a badly tuned one.
+Benign text shaped like an instruction splits current prompt-injection
+detectors. Two published classifiers flag \PanDeepsetRealPromptK{} and
+\PanFmopsRealPromptK{} of \PanDeepsetRealPromptN{} real community role
+prompts, and PIGuard, trained against over-defense, flags
+\PanPiguardRealDocK{} of \PanPiguardRealDocN{} real abstracts about prompt
+injection. The language-model detector flags none of the abstracts. The
+published over-defense benchmark ranks the detectors in a similar order but
+misstates the level for most of them, because it puts trigger words in
+ordinary requests and documentation quotes whole attack phrases. An
+evaluation of over-defense needs both kinds of benign text.
 
-The channel that does target injection matches attack vocabulary, so it fails
-on declarative phrasing that carries no such vocabulary and fires on benign
-security documentation that quotes it, \NKipDoc{} of the \NKipSafe{} benign
-inputs its injection-phrase rule flags. Extending the pattern list recovers declarative and indirect
-coverage without new false positives, from \FlagTprAttack{}\% to
-\DefTprAttack{}\% overall, and leaves both the pre-existing documentation false
-positives and the paraphrase gap in place.
-
-The guard models carry the binary decision, at \BinTprZs{}\% and
-\BinTprTr{}\% recall, but not the label. Neither assigns the jailbreak code to
-any jailbreak probe, even though the trained model saw \NTrainSsixTr{}
-jailbreak rows in training. A category can therefore be defined in the policy,
-demonstrated in the classifier prompt, and supervised, and still never reach
-the output. Degenerate multi-code verdicts add a second trap for anyone
-benchmarking such a classifier, inflating apparent per-category recall by
-\CatInflationSfiveZs{} points on the zero-shot guard. A third sits in the
-trained guard's own recorded $F_1$ of \ReportedFOneTr{}, which is computed on a
-split of its own small synthetic training pool with no hard negatives in it,
-and which stands against the \BinFprTr{}\% benign false-positive rate measured
-here.
-
-Training for injection recall relocates the errors onto benign
-instruction-shaped text, \BinFprLegitTr{}\% of legitimate system prompts here
-and \ExtBinFprTr{}\% of benign items on an external corpus. That follows from
-what the classifier is asked to do: separate an authorised instruction from an
-injected one when the difference between them is provenance and the only input
-it receives is the string.
-
-Two recommendations follow for anyone operating such a stack. Report and alert
-on each channel separately, because a single band or verdict hides which
-question was answered. And hold hard negatives in the evaluation set,
-legitimate system prompts above all, since a detector's behaviour on them is
-what distinguishes recognising an attack from recognising instruction-shaped
-language.
+The layered detector shows why configuration does not fix the failure. Its
+weighted score measures whether text is shaped like a prompt, separating
+prompt-shaped text at \AurocScorePrompt{}\% and attacks at
+\AurocScoreAttack{}\%, and no sampled setting of its weights exceeds chance.
+Its guard models keep the binary verdict and lose the category, and the
+trained guard's recorded $F_1$ of \ReportedFOneTr{} stands against a
+\BinFprTr{}\% benign false-positive rate on hard negatives. What separates an
+authorised instruction from an injected one is who wrote it, and a detector
+that receives only the string cannot see that. Detectors should be evaluated
+on legitimate instructions and on documentation, and deployments should keep
+provenance with the text they filter.
 
 \section*{Ethics and Reproducibility}
 
-All measurements ran against a detection service on the author's own machine
-with benign payloads. No third-party service was exercised and no harmful
+All measurements ran on the author's own machine with benign payloads, the
+published detectors at pinned revisions. No third-party service was exercised and no harmful
 content was generated. The probe set, experiment scripts, analysis, verifier,
 and figure sources are published as an open
 artifact~\cite{rashidi2026artifact}, documented in
@@ -1298,7 +1257,7 @@ QLoRA & quantised low-rank adaptation (QLoRA) & \cite{dettmers2023qlora} \\
 RAG & retrieval augmented generation (RAG), the setting of the indirect probes
       & \cite{greshake2023not} \\
 S1 to S7, H1 & safety categories 1 to 7 and hallucination category 1, the
-      deployed classifier's category codes & Appendix~\ref{app:taxonomy} \\
+      layered detector's category codes & Appendix~\ref{app:taxonomy} \\
 S5 & safety category 5 (S5), prompt injection & Appendix~\ref{app:taxonomy} \\
 S6 & safety category 6 (S6), jailbreak & Appendix~\ref{app:taxonomy} \\
 TPR & true positive rate (TPR), used here as recall
@@ -1317,11 +1276,11 @@ itself a prompt artifact regardless of whether it is an attack.
 An \emph{identifiable weight} is one whose value changes at least one probe
 score on the measured traffic.
 A \emph{degenerate verdict} is a classifier verdict listing five or more of the
-eight categories, which the deployed policy forbids.
+eight categories, which the layered detector's policy forbids.
 A \emph{hard negative} is a benign probe chosen to resemble an attack along one
 feature a detector might rely on.
 
-\section{Deployed Classifier Taxonomy}\label{app:taxonomy}
+\section{Guard Model Taxonomy of the Layered Detector}\label{app:taxonomy}
 
 The policy below is served by the detector's guard-prompt endpoint and is what
 both guard models are prompted with. It is reproduced as retrieved, and it
@@ -1530,7 +1489,7 @@ Two datasets are used, and neither is generated by a language model.
 
 \textbf{The probe set.} \NProbes{} items written by the author from attack
 phrasings published in the works cited in Section~\ref{sec:related}, and
-labelled by the author against the deployed taxonomy reproduced in
+labelled by the author against the layered detector's taxonomy reproduced in
 Appendix~\ref{app:taxonomy}. It is a diagnostic set rather than a sample of
 traffic: group sizes are chosen to populate the crossing of taxonomy label with
 prompt-shapedness, not to reflect any base rate, and the two classes are held
@@ -1592,6 +1551,93 @@ benign template & Hello \{name\}, your order \{order\_id\} shipped today. \\
 \end{tabular}
 \end{table}
 
+\section{Sentence-Level Analysis of the Layered Detector}\label{sec:sentences}
+
+The channel results so far are aggregates. This section reads the detector's
+own per-sentence output, which reports for each sentence a set of linguistic
+tags, the spans that produced them, and a risk verdict. Across the probe set it
+segments \NProbes{} probes into \NSentences{} sentences.
+
+\subsection{Worked examples}\label{sec:worked}
+
+Fig.~\ref{fig:spans} shows what the detector matches, span by span, on eight
+probes, with the verdict each channel returned. The rows are arranged so that
+an attack sits directly above benign text that matches on the same span.
+
+The first pair is the clearest case. The imperative attack and a sentence of
+security documentation about that attack both match the injection-phrase
+pattern on almost identical text, one because it issues the instruction and
+one because it quotes it. Both are marked risky, both are flagged, and both are
+called unsafe by the guard. Nothing downstream of the match can separate them,
+because the matched span is the same string.
+
+The second pair repeats this for the phrase \texttt{system prompt}. It is
+matched inside a declarative attack, and matched again inside a benign
+assignment to a variable named \texttt{system\_prompt}. The third pair shows a
+benign request to summarise a paper on jailbreak taxonomies, flagged because
+the word appears in the pattern list.
+
+The last two rows are the cases the sentence channel gets right. A legitimate
+system prompt tagged only as a directive, and a benign template tagged only as
+a placeholder, are both left unmarked.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_spans.pdf}
+\caption{Per-span analysis on eight probes. Coloured spans are the matches the
+detector reports, with the tag it assigned. The chips give the verdict from
+the sentence channel, the risk-flag rules, and the trained guard. The first
+three pairs place an attack above benign text that matches the same span.}
+\label{fig:spans}
+\end{figure*}
+
+\subsection{The sentence channel repeats the flag channel}
+
+Aggregated, the sentence channel behaves like the rule channel it shares
+vocabulary with. It marks \SentTprAttack{}\% of attack probes and
+\SentFprSafe{}\% of benign probes, and it marks \SentFprDoc{}\% of the
+security-documentation group, the same total failure on that group the
+injection-phrase rule shows. By phrasing it falls from \SentRateImp{}\% on
+imperative attacks to \SentRateDec{}\% on declarative, again matching the rule
+channel.
+
+\subsection{Two tags point the wrong way}\label{sec:tags}
+
+The sentence channel assigns richer tags than the flag channel, so it is worth
+asking whether any tag separates attacks from benign text.
+Table~\ref{tab:tags} tests each one.
+
+The injection-phrase tag, the one the detector treats as its risk signal, does
+not separate the two groups ($p=\TagPInjectionPhrase{}$). Three tags do reach
+significance, and two of them point at benign text rather than at attacks.
+The directive tag appears on \TagBenDirective{}\% of benign probes against
+\TagAtkDirective{}\% of attacks ($p=\TagPDirective{}$), because ordinary
+requests and legitimate system prompts are written as directives while
+declarative injections are not. The placeholder tag appears only on benign
+probes ($p=\TagPPlaceholder{}$). The neutral tag, which marks a sentence
+carrying no linguistic signal at all, is the one tag that favours attacks,
+at \TagAtkNeutral{}\% against \TagBenNeutral{}\% ($p=\TagPNeutral{}$),
+because a declarative injection reads as a plain statement of fact.
+
+\begin{table}[t]
+\centering
+\caption{Sentence tags as detectors. Direction names the class the tag is more
+common in. The tag the detector treats as its risk signal does not separate
+the classes, and the two significant tags that do point at benign text.}
+\label{tab:tags}
+\footnotesize
+\input{tables/tab_tags.tex}
+\end{table}
+
+This is the channel-level result of Section~\ref{sec:channels} restated at the
+level of individual sentences. The features available to the detector are
+correlated with instruction-shaped and template-shaped writing, which benign
+production text contains more of than attacks do. A detector built on them
+inherits that correlation whatever weight it assigns, in the same way a
+classifier inherits any surface regularity that happens to track its
+label~\cite{geirhos2020shortcut, lapuschkin2019cleverhans}.
+
+% ============================================================
 \section{Artifact Availability}\label{app:artifact}
 
 The probe set, the experiment scripts, the raw measurement outputs, and the

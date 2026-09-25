@@ -18,6 +18,7 @@ import re
 import sys
 
 import pandas as pd
+from scipy.stats import fisher_exact
 
 CFG = json.loads(pathlib.Path("config.json").read_text())
 R = pathlib.Path("results")
@@ -272,6 +273,99 @@ def main():
     if drifted:
         FAILURES.append(f"run_meta captured non-default weights: {drifted}")
 
+    # ---- the seven-detector comparison, recomputed independently
+    src = json.loads((R / "panel" / "PANEL_SOURCE.json").read_text())
+    inj = {d: c["injection_label"] for d, c in src["detectors"].items()}
+    raw = {(r["guard"], r["text_sha"]): r for r in
+           (json.loads(l) for l in (R / "panel" / "guard_raw.jsonl").read_text().splitlines())}
+    pflag = {}
+    for v in (json.loads(l) for l in (R / "panel" / "verdicts.jsonl").read_text().splitlines()):
+        if "error" in v:
+            FAILURES.append(f"panel verdict error: {v['id']} {v['detector']}")
+            continue
+        if v["detector"] in inj and v.get("from") != "phase1":
+            r = raw.get((v["detector"], v["text_sha"]))
+            if r is None:
+                FAILURES.append(f"panel {v['id']} {v['detector']}: no raw call")
+            else:
+                scores = json.loads(r["raw"])
+                check(f"panel raw {v['id']} {v['detector']}", int(max(scores, key=scores.get) == inj[v["detector"]]),
+                      int(v["flag"]), tol=0)
+        pflag[(v["id"], v["detector"])] = bool(v["flag"])
+    grp = {}
+    for _, r in base.iterrows():
+        grp[r["id"]] = "Atk" if r["true_label"] in ("S5", "S6") else {"legit_prompt": "Legit", "security_doc": "Doc",
+                                                                    "benign_template": "Tmpl", "benign": "Plain"}[r["phrasing"]]
+    keyname = {"protectai": "Protectai", "piguard": "Piguard", "deepset": "Deepset", "fmops": "Fmops",
+               "llm": "Llm", "llm27": "Llmtwoseven"}
+    legit_all = 0
+    for d, K in keyname.items():
+        for G in ("Atk", "Legit", "Doc", "Tmpl", "Plain"):
+            ids = [i for i, g in grp.items() if g == G]
+            k = sum(pflag[(f"t35_{i}", d)] for i in ids)
+            check(f"Pan{K}{G}K", k, M.get(f"Pan{K}{G}K"), tol=0)
+            check(f"Pan{K}{G}N", len(ids), M.get(f"Pan{K}{G}N"), tol=0)
+            if G == "Legit" and k == len(ids):
+                legit_all += 1
+        ni = [key for key in pflag if key[0].startswith("notinject_") and key[1] == d]
+        check(f"Pan{K}NotInjectK", sum(pflag[x] for x in ni), M.get(f"Pan{K}NotInjectK"), tol=0)
+    check("NFlagAllLegit", legit_all, M.get("NFlagAllLegit"), tol=0)
+    # Bench flag rules: recomputed from the raw channel outputs.
+    ni_csv = pd.read_csv(R / "notinject.csv")
+    ni_flag = int(sum(1 for x in ni_csv.direct_flags if isinstance(x, str) and x.strip()))
+    doc = base[base.phrasing == "security_doc"]
+    doc_flag = int(sum(1 for x in doc.direct_flags if isinstance(x, str) and x.strip()))
+    check("PanBenchflagNotInjectK", ni_flag, M.get("PanBenchflagNotInjectK"), tol=0)
+    nig = pd.read_csv(R / "notinject_guards.csv")
+    for col, key in (("local_bionic_guard_unsafe", "PanBenchzsNotInjectK"), ("model_67276875f520_unsafe", "PanBenchtrNotInjectK")):
+        errs = int(sum(str(x) == "error" for x in nig[col]))
+        if errs:
+            FAILURES.append(f"{col}: {errs} guard errors on NotInject")
+        check(key, int(sum(str(x) == "True" for x in nig[col])), M.get(key), tol=0)
+    check("PanBenchflagDocK", doc_flag, M.get("PanBenchflagDocK"), tol=0)
+    # Real corpora, recomputed from the panel verdicts and the bench CSV.
+    for d, K in keyname.items():
+        for pre, G in (("prompts_", "RealPrompt"), ("arxivsec_", "RealDoc")):
+            xs = [f for (i, dd), f in pflag.items() if dd == d and i.startswith(pre)]
+            check(f"Pan{K}{G}K", sum(xs), M.get(f"Pan{K}{G}K"), tol=0)
+    rc = pd.read_csv(R / "real_corpora.csv")
+    for col, K in (("local_bionic_guard_unsafe", "Benchzs"), ("model_67276875f520_unsafe", "Benchtr")):
+        for corp, G in (("prompts_chat", "RealPrompt"), ("arxiv_security", "RealDoc")):
+            sub = rc[rc.corpus == corp][col]
+            if any(str(x) == "error" for x in sub):
+                FAILURES.append(f"{col} errors on {corp}")
+            check(f"Pan{K}{G}K", int(sum(str(x) == "True" for x in sub)), M.get(f"Pan{K}{G}K"), tol=0)
+    # Rank agreement and per-detector level differences, NotInject against
+    # the security abstracts, over every output that flags anything.
+    from scipy.stats import spearmanr as _sp
+    outs = []
+    for K in list(keyname.values()) + ["Benchflag", "Benchzs", "Benchtr"]:
+        kn, nn = int(M[f"Pan{K}NotInjectK"]), int(M[f"Pan{K}NotInjectN"])
+        kd, nd = int(M[f"Pan{K}RealDocK"]), int(M[f"Pan{K}RealDocN"])
+        outs.append((kn, nn, kd, nd))
+    rho = _sp([a / b for a, b, _, _ in outs], [c / d for _, _, c, d in outs])[0]
+    check("PanNiDocRho", round(float(rho), 3), M.get("PanNiDocRho"), tol=0.001)
+    hi = sum(1 for a, b, c, d in outs if fisher_exact([[a, b - a], [c, d - c]])[1] < 0.05 / len(outs) and c / d > a / b)
+    check("NPanDocHigher", hi, M.get("NPanDocHigher"), tol=0)
+    if not hi > len(outs) / 2:
+        FAILURES.append("claim broken: most detector outputs no longer flag documentation more than NotInject")
+
+    # Claims: the benchmark disagreement is significant, and the language-model
+    # detector flags no security document.
+    p_dis = fisher_exact([[ni_flag, len(ni_csv) - ni_flag], [doc_flag, len(doc) - doc_flag]])[1]
+    if not p_dis < 0.05:
+        FAILURES.append("claim broken: NotInject and security documentation no longer disagree for the flag rules")
+    if M.get("PanLlmDocK") != "0":
+        FAILURES.append("claim broken: the language-model detector now flags a security document")
+
+    # ---- datasheet counts for the added corpora
+    readme = re.sub(r"\s+", " ", pathlib.Path("data/README.md").read_text()) if pathlib.Path("data/README.md").exists() else ""
+    n_ni = len(pathlib.Path("data/external/notinject.jsonl").read_text().splitlines())
+    n_pv = len((R / "panel" / "verdicts.jsonl").read_text().splitlines())
+    for claim in (f"`external/notinject.jsonl`, {n_ni} benign prompts", f"{n_pv} verdicts in all"):
+        if claim not in readme:
+            FAILURES.append(f"datasheet disagrees with the files: {claim!r} not found")
+
     # ---- publish the verifier's own counts before auditing Paper.tex
     # CHECKED is final here: the hygiene block below records failures directly
     # rather than through check(). Writing the macro now lets the paper cite
@@ -307,6 +401,9 @@ def main():
 
         # A bare percentage in the prose cannot be re-derived from the data.
         for m in re.finditer(r"(?<![\\A-Za-z0-9])(\d+\.\d+)\s*\\%", body):
+            FAILURES.append(f"hardcoded percentage in Paper.tex: {m.group(0)!r}")
+        # Whole-number percentages and "percent" typed in words count too.
+        for m in re.finditer(r"(?<![\\A-Za-z0-9{])(\d+)\s*(\\%|percent)", body):
             FAILURES.append(f"hardcoded percentage in Paper.tex: {m.group(0)!r}")
 
         for bad, why in [("\u2014", "em dash"), ("\u2013", "en dash"),

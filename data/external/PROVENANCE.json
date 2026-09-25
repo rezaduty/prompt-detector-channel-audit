@@ -1,0 +1,24 @@
+{
+ "notinject": {
+  "repo": "leolee99/NotInject",
+  "revision": "847ae76cf8fea5ed325429e569ae8cfef022d2e0",
+  "licence": "MIT"
+ },
+ "n": 339,
+ "prompts_chat": {
+  "repo": "fka/prompts.chat",
+  "revision": "fbea17f2045d053d27f1de9f099e9bfdbe55bf47",
+  "licence": "CC0-1.0",
+  "excluded_by_jailbreak_markers": 58,
+  "sampled": 200,
+  "seed": 20260925
+ },
+ "arxiv_security": {
+  "source": "data/sources/snapshot.json, arXiv vocab queries",
+  "licence": "CC0-1.0"
+ },
+ "n_real": {
+  "prompts_chat": 200,
+  "arxiv_security": 61
+ }
+}

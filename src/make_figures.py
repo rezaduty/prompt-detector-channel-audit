@@ -473,8 +473,55 @@ def fig_spans(b):
     print(f"  wrote {F}/fig_spans.html")
 
 
+def fig_panel():
+    """Share of instruction-shaped benign text each detector output flags:
+    legitimate system prompts, security documentation, and NotInject, with
+    Wilson intervals. Counts are read from the generated macros, so the
+    figure cannot drift from the table, and the plotted values are written
+    beside the figure for check_figures.py."""
+    import re
+    mac = dict(re.findall(r"\\newcommand\{\\([A-Za-z]+)\}\{([^}]*)\}",
+                          pathlib.Path("paper/tables/macros.tex").read_text()))
+    dets = [("Protectai", "ProtectAI"), ("Piguard", "PIGuard"), ("Deepset", "deepset"),
+            ("Fmops", "DistilBERT"), ("Llm", "LLM 9B"), ("Llmtwoseven", "LLM 27B"),
+            ("Benchflag", "bench flags"), ("Benchzs", "bench zero-shot"), ("Benchtr", "bench trained")]
+    series = [("RealPrompt", "real role prompts", BLUE), ("RealDoc", "real security abstracts", RED),
+              ("NotInject", "NotInject", GREY)]
+    fig, ax = plt.subplots(figsize=(FULL, 2.5))
+    w = 0.26
+    plotted = {}
+    for j, (key, label, color) in enumerate(series):
+        xs, ys, lo, hi = [], [], [], []
+        for i, (d, _) in enumerate(dets):
+            k, n = int(mac.get(f"Pan{d}{key}K", 0)), int(mac.get(f"Pan{d}{key}N", 0))
+            if n == 0:
+                continue
+            p = k / n
+            a, b = wilson(k, n)
+            xs.append(i + (j - 1) * w)
+            ys.append(p)
+            lo.append(max(0.0, p - a))
+            hi.append(max(0.0, b - p))
+            plotted[f"{d}|{key}"] = [k, n]
+        ax.bar(xs, ys, w * 0.92, color=color, label=label)
+        ax.errorbar(xs, ys, yerr=[lo, hi], fmt="none", ecolor=INK, elinewidth=0.7, capsize=1.5)
+    ax.set_xticks(range(len(dets)))
+    ax.set_xticklabels([n for _, n in dets], rotation=22, ha="right", rotation_mode="anchor")
+    ax.set_ylim(0, 1.06)
+    ax.set_yticks([0, 0.25, 0.5, 0.75, 1.0])
+    ax.set_yticklabels(["0", "25", "50", "75", "100"])
+    ax.set_ylabel("benign items flagged (%)")
+    fig.legend(loc="upper center", ncol=3, frameon=False, bbox_to_anchor=(0.5, 1.04))
+    fig.tight_layout(pad=0.55, rect=(0, 0, 1, 0.9))
+    fig.savefig(F / "fig_panel.pdf", bbox_inches="tight", pad_inches=0.035)
+    plt.close(fig)
+    (F / "fig_panel.json").write_text(json.dumps(plotted, indent=1))
+    print(f"  wrote {F/'fig_panel.pdf'}")
+
+
 def main():
     b = load_baseline()
+    fig_panel()
     fig_signal_coverage(b)
     fig_score_distributions(b)
     fig_weight_search()

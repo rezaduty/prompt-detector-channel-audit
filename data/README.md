@@ -140,6 +140,60 @@ appear.
 
 ---
 
+## 3. NotInject (redistributed, MIT)
+
+`external/notinject.jsonl`, 339 benign prompts, frozen from the Hugging Face
+dataset `leolee99/NotInject` at revision
+`847ae76cf8fea5ed325429e569ae8cfef022d2e0` (MIT licence), the over-defense
+benchmark released with InjecGuard (arXiv:2410.22770). Each prompt carries
+one, two or three trigger words such as *ignore*, in three splits of 113.
+Every item is benign by the publisher's construction. `external/PROVENANCE.json`
+records the source and revision. The layered detector's rule channels are
+scored on it in `results/notinject.csv`.
+
+---
+
+## 4. Detector panel verdicts
+
+`results/panel/verdicts.jsonl` holds one verdict per detector per item for the
+six published and language-model detectors, on the probe set, NotInject,
+the deepset test split and the two real corpora of section 5, 4842 verdicts
+in all. `results/panel/guard_raw.jsonl`
+holds the raw output behind each verdict: the label scores of every classifier
+call and the answer of every language-model call. They were produced by phase
+11 of the companion AutoGen study (`title36-autogen-guard-placement`,
+`src/run_experiment.py`), whose model revisions and corpus revisions are
+recorded in `results/panel/PANEL_SOURCE.json`. The verifier re-derives every
+classifier verdict from its raw scores.
+
+---
+
+## 5. Real instruction-shaped benign text
+
+`external/real_corpora.jsonl`, 261 items in two corpora, each item with its
+source identifier. `external/PROVENANCE.json` records the revisions.
+
+- **Role prompts (200).** Community prompts that instruct a model to take a
+  role or do a task, from the Hugging Face dataset `fka/prompts.chat` at
+  revision `fbea17f2045d053d27f1de9f099e9bfdbe55bf47` (CC0 1.0), 2169
+  prompts in all. Community collections include jailbreak prompts, so a
+  prompt is excluded when it matches a list of jailbreak markers (DAN,
+  developer mode, jailbreak, no restrictions, ignore previous, uncensored and
+  similar, listed in `fetch_panel_data.py` of the companion study). The
+  filter excludes 58 prompts. From the rest, 200 are drawn with seed
+  20260925. Every drawn prompt that contains a term that could signal a
+  jailbreak (restrict, ignore, hack, weapon and similar) was read by one
+  annotator. All read as benign role or task instructions, for example a
+  game design brief that mentions weapon models.
+- **Security abstracts (61).** Abstracts of arXiv papers about prompt
+  injection (arXiv metadata, CC0 1.0), from the companion study's frozen
+  snapshot. They describe attacks and quote attack phrasing and are benign.
+
+Both corpora are benign by source and by the read above. There is no second
+annotator.
+
+---
+
 ## Derived result files
 
 `results/` holds the raw output of every measurement phase, including

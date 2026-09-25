@@ -12,9 +12,9 @@ license, and indicate if changes were made.
 Full licence text: https://creativecommons.org/licenses/by/4.0/legalcode
 
 ATTRIBUTION
-    Rashidi, M. (2026). Calibration Limits of Weighted Rule Signals and
-    Taxonomy Label Inflation in Guard Model Classification of Prompt
-    Injection. Artifact: https://github.com/rezaduty/prompt-detector-channel-audit
+    Rashidi, M. (2026). False Positives of Prompt-Injection Detectors
+    on Instruction-Shaped Benign Text: A Comparative Evaluation Across
+    Seven Detectors. Artifact: https://github.com/rezaduty/prompt-detector-channel-audit
 
 THIRD-PARTY DATA
     This repository does not redistribute the deepset/prompt-injections

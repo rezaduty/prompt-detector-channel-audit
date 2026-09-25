@@ -1,6 +1,6 @@
 cff-version: 1.2.0
 message: "If you use this artifact, please cite the paper below."
-title: "Calibration Limits of Weighted Rule Signals and Taxonomy Label Inflation in Guard Model Classification of Prompt Injection"
+title: "False Positives of Prompt-Injection Detectors on Instruction-Shaped Benign Text: A Comparative Evaluation Across Seven Detectors"
 abstract: >-
   Measurement artifact for a study of a layered prompt injection detector.
   Contains a 91-probe diagnostic set crossing taxonomy label with

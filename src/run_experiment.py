@@ -491,6 +491,70 @@ def phase8_external(probes):
     print(f"   wrote {path}")
 
 
+def phase11_real(probes):
+    """The layered detector's rule channels and guard models on two real
+    corpora: community role prompts (fka/prompts.chat, CC0) and arXiv
+    abstracts about prompt injection (CC0), frozen in
+    data/external/real_corpora.jsonl."""
+    rows = [json.loads(l) for l in pathlib.Path("data/external/real_corpora.jsonl").read_text().splitlines()]
+    path = RESULTS / "real_corpora.csv"
+    print(f"P11 real corpora: {len(rows)} items")
+    with open(path, "w", newline="") as f:
+        w = csv.writer(f)
+        cols = ["id", "corpus", "text_len", "direct_score", "direct_band", "direct_signals", "direct_flags"]
+        cols += [f"{tag(m)}_unsafe" for m in GUARD_MODELS] + [f"{tag(m)}_codes" for m in GUARD_MODELS]
+        w.writerow(cols)
+        for r in rows:
+            d, _, _ = channels(policy_test(r["text"]))
+            out = [r["id"], r["corpus"], len(r["text"]), d.get("score", -1), d.get("band", "error"),
+                   "|".join(x["name"] for x in d.get("signals", [])), "|".join(d.get("risk_flags", []))]
+            un, co = [], []
+            for mid in GUARD_MODELS:
+                try:
+                    g = guard_classify(r["text"], mid, explain=False)
+                    un.append(bool(g.get("unsafe")))
+                    co.append(",".join(g.get("codes", [])))
+                except Exception as e:
+                    un.append("error")
+                    co.append(str(e)[:40])
+            w.writerow(out + un + co)
+    print(f"   wrote {path}")
+
+
+def phase9_notinject(probes, with_guards=False):
+    """The two rule channels, and optionally the guard models, on NotInject,
+    the over-defense benchmark of benign prompts with trigger words (MIT,
+    frozen in data/external/notinject.jsonl with its revision)."""
+    rows = [json.loads(l) for l in pathlib.Path("data/external/notinject.jsonl").read_text().splitlines()]
+    path = RESULTS / ("notinject_guards.csv" if with_guards else "notinject.csv")
+    print(f"P9 NotInject: {len(rows)} benign prompts, guards={with_guards}")
+    with open(path, "w", newline="") as f:
+        w = csv.writer(f)
+        cols = ["id", "group", "text_len"]
+        cols += ([f"{tag(m)}_unsafe" for m in GUARD_MODELS] + [f"{tag(m)}_codes" for m in GUARD_MODELS]) if with_guards else \
+                ["direct_score", "direct_band", "direct_signals", "direct_flags"]
+        w.writerow(cols)
+        for i, r in enumerate(rows):
+            out = [r["id"], r["group"], len(r["text"])]
+            if with_guards:
+                un, co = [], []
+                for mid in GUARD_MODELS:
+                    try:
+                        g = guard_classify(r["text"], mid, explain=False)
+                        un.append(bool(g.get("unsafe")))
+                        co.append(",".join(g.get("codes", [])))
+                    except Exception as e:
+                        un.append("error")
+                        co.append(str(e)[:40])
+                out += un + co
+            else:
+                d, _, _ = channels(policy_test(r["text"]))
+                out += [d.get("score", -1), d.get("band", "error"),
+                        "|".join(x["name"] for x in d.get("signals", [])), "|".join(d.get("risk_flags", []))]
+            w.writerow(out)
+    print(f"   wrote {path}")
+
+
 # ---------------------------------------------------------------- main
 
 def main():
@@ -515,11 +579,12 @@ def main():
         "n_probes": len(probes),
         "repeats": REPEATS,
     }
-    (RESULTS / "run_meta.json").write_text(
-        json.dumps(redact_paths(meta), indent=1))
-    print(f"   wrote {RESULTS/'run_meta.json'}")
-
     only = sys.argv[1:] or ["1", "2", "3", "4", "5", "6", "7", "8"]
+    # The NotInject phases, added later, keep their own capture so the
+    # original run's record is not overwritten.
+    meta_name = "run_meta_notinject.json" if set(only) <= {"9", "10", "11"} else "run_meta.json"
+    (RESULTS / meta_name).write_text(json.dumps(redact_paths(meta), indent=1))
+    print(f"   wrote {RESULTS/meta_name}")
     t0 = time.time()
     try:
         if "1" in only:
@@ -538,6 +603,12 @@ def main():
             phase7_sentences(probes)
         if "8" in only:
             phase8_external(probes)
+        if "9" in only:
+            phase9_notinject(probes)
+        if "10" in only:
+            phase9_notinject(probes, with_guards=True)
+        if "11" in only:
+            phase11_real(probes)
     finally:
         restore_defaults()
         assert_defaults_match()
