@@ -20,6 +20,7 @@ command -v pdflatex >/dev/null 2>&1 || {
 python3 src/analyze.py
 python3 src/verify_numbers.py
 python3 src/make_figures.py
+if [ -f src/make_diagrams.py ]; then python3 src/make_diagrams.py; fi
 python3 src/check_figures.py
 sh paper/figures/render_html_figs.sh
 

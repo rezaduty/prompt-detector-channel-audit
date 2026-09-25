@@ -49,6 +49,11 @@ determine what question each output actually answers.
     results/             raw CSVs, all 546 guard calls, captured configuration
     paper/               IEEEtran LaTeX, generated macros and tables, figures
 
+Concept diagrams (`paper/figures/fig_channels`, `fig_protocol`) are included
+as rendered PDFs only. Their sources are not distributed. `build.sh`, the
+render script and the figure checker use the shipped PDFs when a source is
+absent.
+
 ## Measurement phases
 
 | Phase | What it does | Scale |

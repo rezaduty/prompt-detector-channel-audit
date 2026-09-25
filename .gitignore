@@ -13,3 +13,8 @@ paper/*.bbl
 paper/*.xdv
 paper/*.fls
 paper/*.fdb_latexmk
+
+# Concept-diagram sources are not distributed. The rendered PDFs are.
+paper/figures/*.html
+src/diagram_kit.py
+src/make_diagrams.py
