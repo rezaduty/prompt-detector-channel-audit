@@ -1,0 +1,110 @@
+{
+ "Protectai|RealPrompt": [
+  2,
+  200
+ ],
+ "Piguard|RealPrompt": [
+  12,
+  200
+ ],
+ "Deepset|RealPrompt": [
+  200,
+  200
+ ],
+ "Fmops|RealPrompt": [
+  198,
+  200
+ ],
+ "Llm|RealPrompt": [
+  11,
+  200
+ ],
+ "Llmtwoseven|RealPrompt": [
+  44,
+  200
+ ],
+ "Benchflag|RealPrompt": [
+  123,
+  200
+ ],
+ "Benchzs|RealPrompt": [
+  64,
+  200
+ ],
+ "Benchtr|RealPrompt": [
+  112,
+  200
+ ],
+ "Protectai|RealDoc": [
+  2,
+  61
+ ],
+ "Piguard|RealDoc": [
+  39,
+  61
+ ],
+ "Deepset|RealDoc": [
+  61,
+  61
+ ],
+ "Fmops|RealDoc": [
+  61,
+  61
+ ],
+ "Llm|RealDoc": [
+  0,
+  61
+ ],
+ "Llmtwoseven|RealDoc": [
+  0,
+  61
+ ],
+ "Benchflag|RealDoc": [
+  49,
+  61
+ ],
+ "Benchzs|RealDoc": [
+  57,
+  61
+ ],
+ "Benchtr|RealDoc": [
+  51,
+  61
+ ],
+ "Protectai|NotInject": [
+  147,
+  339
+ ],
+ "Piguard|NotInject": [
+  39,
+  339
+ ],
+ "Deepset|NotInject": [
+  242,
+  339
+ ],
+ "Fmops|NotInject": [
+  243,
+  339
+ ],
+ "Llm|NotInject": [
+  12,
+  339
+ ],
+ "Llmtwoseven|NotInject": [
+  27,
+  339
+ ],
+ "Benchflag|NotInject": [
+  13,
+  339
+ ],
+ "Benchzs|NotInject": [
+  98,
+  339
+ ],
+ "Benchtr|NotInject": [
+  129,
+  339
+ ]
+}
