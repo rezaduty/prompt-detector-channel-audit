@@ -12,6 +12,8 @@
 \usepackage{listings}
 \usepackage{placeins}
 \usepackage{float}
+\newtheorem{definition}{Definition}
+\newtheorem{proposition}{Proposition}
 \lstset{basicstyle=\ttfamily\footnotesize,frame=single,columns=fullflexible,
         breaklines=true,captionpos=b,xleftmargin=4pt,xrightmargin=4pt}
 % Citations, cross-references, and URLs render as coloured clickable links.
@@ -54,8 +56,11 @@ detector flags none. The over-defense benchmark NotInject ranks the detectors
 in a similar order but misstates the level for \NPanDocHigher{} of
 \NPanRanked{} detector outputs, which flag documentation significantly more
 often than NotInject prompts. The layered detector adds a second failure.
-Its weighted score measures whether text is shaped like a prompt, and no
-setting of its weights separates attacks from benign traffic. Every number is
+Its weighted score measures whether text is shaped like a prompt. We write the
+score as a function of its weights, check that function against all
+\NScoreModelCells{} recorded scores, and prove that no setting of the weights
+and threshold flags any attack without flagging benign text, and that no
+setting ranks attacks above benign text better than chance. Every number is
 re-derived by an independent verifier.
 \end{abstract}
 
@@ -108,9 +113,9 @@ weights would fix what it gets wrong.
   detectors like real security documentation does but misstates their level
   for most of them (Section~\ref{sec:disagree}).
 \item A configuration-level audit of a layered detector: its weighted score
-  measures prompt shape, and a search over its joint weight space never
-  separates attacks from benign traffic (Sections~\ref{sec:channels}
-  and~\ref{sec:calibration}).
+  measures prompt shape, and three propositions, proved and checked against
+  every recorded score, bound what any weight setting can achieve
+  (Sections~\ref{sec:channels} and~\ref{sec:calibration}).
 \item An audit of the layered detector's guard models: the binary verdict
   holds and the category label does not, and the trained model's recorded
   evaluation hides its false positives (Sections~\ref{sec:guard}
@@ -198,13 +203,40 @@ budget in comparable settings~\cite{bergstra2012random}.
   them, because the two put the trigger phrase in different kinds of benign
   text.
 \item \emph{The reachable configuration space of a layered detector.} Instead of
-  scoring one setting, a search over the detector's joint weight space bounds
-  what any setting can achieve, which separates a weight that is set badly
-  from a channel that measures the wrong property.
+  scoring one setting, exact bounds over the detector's whole weight space
+  (Propositions~\ref{prop:zerofp} to~\ref{prop:auroc}) state what any setting
+  can achieve, which separates a weight that is set badly from a channel that
+  measures the wrong property.
 \item \emph{Category labels and recorded metrics of guard models.} The binary
   verdict and the category label are scored separately, and a guard's recorded
   evaluation is compared with the same guard on hard negatives.
 \end{itemize}
+
+Table~\ref{tab:positioning} scores the closest prior work on the same
+properties.
+
+\begin{table}[t]
+\centering
+\caption{Positioning against the closest prior work. AgentDojo and
+JailbreakBench score what a target model does once a payload reaches it
+(Section~\ref{sec:related}), so they do not evaluate a detector in
+isolation.}
+\label{tab:positioning}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lcccc}
+\toprule
+Property & \cite{li2024injecguard} & \cite{debenedetti2024agentdojo} & \cite{chao2024jailbreakbench} & Ours \\
+\midrule
+Scores detectors in isolation & $\checkmark$ & $\times$ & $\times$ & $\checkmark$ \\
+Several published detectors & $\checkmark$ & $\times$ & $\times$ & $\checkmark$ \\
+Trigger words in ordinary requests & $\checkmark$ & $\times$ & $\times$ & $\checkmark$ \\
+Instruction-shaped benign text & $\times$ & $\times$ & $\times$ & $\checkmark$ \\
+Bounds over a detector's settings & $\times$ & $\times$ & $\times$ & $\checkmark$ \\
+Category label apart from verdict & $\times$ & $\times$ & $\times$ & $\checkmark$ \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 % ============================================================
 \section{Threat Model and Scope}\label{sec:threat}
@@ -288,6 +320,27 @@ signal has an integer weight, editable at runtime. The sum is compared against
 band thresholds to produce a label of none, low, medium, or high. The full
 signal list with shipped weights is in Appendix~\ref{app:signals},
 Table~\ref{tab:signalweights}.
+
+\begin{definition}[Salience score]\label{def:score}
+Let $\mathcal{S}$ be the \NSignalsTotal{} signals, $\ell \in \mathcal{S}$ the
+linguistic signal, and $w \in \mathbb{Z}_{\ge 0}^{\mathcal{S}}$ the weight
+vector, each weight at most $C$. For a text $x$, let $F(x) \subseteq
+\mathcal{S}$ be the signals whose patterns match $x$ and $h(x)$ the number of
+distinct linguistic phrases it contains. The score is
+\begin{equation}\label{eq:score}
+s_w(x) = \min\Bigl(C,\ \sum_{i \in F(x)\setminus\{\ell\}} w_i
+  + \mathbb{1}[\ell \in F(x)]\,\min\bigl(w_\ell,\ \kappa\,h(x)\bigr)\Bigr),
+\end{equation}
+with $\kappa = \BoundLingPerHit{}$ and $C = \BoundScoreCap{}$ as captured from
+the service. The text reaches a band when $s_w(x) \ge \tau$, with
+$\tau = \BoundBandLow{}$ for the lowest band.
+\end{definition}
+
+Neither $F(x)$ nor $h(x)$ depends on $w$, since both come from pattern
+matches. Equation~(\ref{eq:score}) reproduces all \NScoreModelCells{} scores
+recorded in the joint weight search of Section~\ref{sec:calibration}, so the
+bounds derived from it are statements about the live service, not about a
+model of it.
 
 \textbf{Risk flags.} Four boolean pattern rules, evaluated independently of the
 score: a prompt built by concatenation with an externally-sourced identifier,
@@ -450,12 +503,20 @@ number is regenerated from the logs.}
 \end{figure*}
 
 \subsection{Metrics}
-Recall, the true positive rate (TPR), is the fraction of attack probes a
-channel marks positive. The false positive rate (FPR) is the fraction of benign
-probes it marks positive, also reported per hard-negative group. Separation is
-the rank area under the receiver operating characteristic curve
-(AUROC)~\cite{fawcett2006introduction, mann1947test} between attack and benign
-scores, with ties counted as one half. Rate charts carry Wilson score
+Let $A$ be the attack probes, $B$ the benign probes, and $d(x) \in \{0,1\}$ a
+channel's decision on text $x$. Recall, the true positive rate, and the false
+positive rate are
+\begin{equation}\label{eq:rates}
+\mathrm{TPR} = \frac{1}{|A|}\sum_{x \in A} d(x), \qquad
+\mathrm{FPR} = \frac{1}{|B|}\sum_{x \in B} d(x),
+\end{equation}
+the second also reported per hard-negative group. For a channel with a score
+$s$, separation is the rank area under the receiver operating characteristic
+curve~\cite{fawcett2006introduction, mann1947test}, ties counted as one half,
+\begin{equation}\label{eq:auroc}
+\mathrm{AUROC}(s) = \frac{1}{|A|\,|B|}\sum_{a \in A}\sum_{b \in B}
+  \Bigl(\mathbb{1}[s(a) > s(b)] + \tfrac{1}{2}\,\mathbb{1}[s(a) = s(b)]\Bigr).
+\end{equation} Rate charts carry Wilson score
 intervals~\cite{wilson1927interval}, since several groups hold fewer than ten
 probes and a bare rate would overstate what they support. Two-group rate
 comparisons are tested with Fisher's exact
@@ -674,7 +735,63 @@ across all five.}
 \section{Results: No Setting of the Layered Detector's Weights Separates Attacks}\label{sec:calibration}
 
 Section~\ref{sec:channels} shows the shipped weights do not make the score
-channel an injection detector. This section asks whether any weights do.
+channel an injection detector. This section asks whether any weights do. It
+answers exactly first, from Definition~\ref{def:score}, and then shows the
+empirical sweeps that the exact answer explains.
+
+\subsection{Exact bounds over every weight vector}\label{sec:bounds}
+
+Two facts about the probe set, read off the recorded matches, drive the
+bounds. Of the \NBoundAttack{} attack probes, \NBoundAttackSilent{} match no
+signal at all, and the other \NBoundAttackLing{} match only the linguistic
+signal, with at most $\BoundAttackMaxHits{}$ distinct phrases. Among the benign
+probes, \NBoundBenignLing{} match the linguistic signal, and
+\NBoundBenignMaxHits{} of them contain $\BoundBenignMaxHits{}$ distinct phrases.
+
+\begin{proposition}\label{prop:zerofp}
+For every weight vector $w$ and every threshold $t > 0$, if some attack probe
+scores at least $t$, then some benign probe scores at least $t$. So no setting
+of the weights and threshold flags an attack without flagging benign text.
+\end{proposition}
+\begin{IEEEproof}
+An attack $a$ with $s_w(a) \ge t > 0$ matches only $\ell$, so
+$s_w(a) = \min(w_\ell, \kappa h(a))$ with $h(a) \le \BoundAttackMaxHits{}$. Take
+a benign probe $b$ with $h(b) = \BoundBenignMaxHits{} > h(a)$. All weights are
+non-negative and $w_\ell \le C$, so $s_w(b) \ge \min(w_\ell, \kappa h(b)) \ge
+\min(w_\ell, \kappa h(a)) = s_w(a) \ge t$.
+\end{IEEEproof}
+
+\begin{proposition}\label{prop:band}
+For every weight vector $w$, every attack probe scores at most
+$\BoundAttackMaxScore{}$, below the shipped low-band threshold of
+$\BoundBandLow{}$. So no setting of the weights brings any attack probe into a
+band.
+\end{proposition}
+\begin{IEEEproof}
+Silent attacks score $0$. The others score $\min(w_\ell, \kappa h(a)) \le
+\kappa h(a) \le \BoundLingPerHit{} \cdot \BoundAttackMaxHits{} =
+\BoundAttackMaxScore{}$.
+\end{IEEEproof}
+
+\begin{proposition}\label{prop:auroc}
+$\max_w \mathrm{AUROC}(s_w) = \BoundAurocMax{}\%$, attained only when
+every probe scores $0$. With the linguistic weight switched on, the maximum is
+\BoundAurocMaxLingOn{}\%.
+\end{proposition}
+\begin{IEEEproof}
+Attack scores depend on $w_\ell$ alone, since attacks match no other signal.
+Every benign score is non-decreasing in every weight, and by
+Equation~(\ref{eq:auroc}) AUROC is non-increasing in every benign score, so
+AUROC is non-increasing in every weight other than $w_\ell$ and its maximum
+has them at zero. What remains is one integer variable $w_\ell \in \{0,
+\dots, C\}$, and evaluating Equation~(\ref{eq:auroc}) at every value gives the
+two maxima.
+\end{IEEEproof}
+
+Propositions~\ref{prop:zerofp} to~\ref{prop:auroc} replace sampling with
+proof, and the verifier recomputes each bound from the raw scores through its
+own code path (Section~\ref{sec:verify}). The sweeps below remain useful for
+what they show about individual weights, but they no longer carry the claim.
 
 \subsection{One weight at a time}
 
@@ -721,7 +838,12 @@ One-at-a-time sweeps cannot rule out an interaction, so P3 samples the joint
 space. Over \NSearchConfigs{} weight vectors and \NSearchCells{} scored cells,
 the best separation reached is \SearchBestAuroc{}\%, the mean is
 \SearchMeanAuroc{}\%, and \SearchNAboveHalf{} vectors exceed chance
-(Fig.~\ref{fig:search}, Table~\ref{tab:search}). The best $F_1$ at any
+(Fig.~\ref{fig:search}, Table~\ref{tab:search}), as
+Proposition~\ref{prop:auroc} requires. The best sampled vector sets the
+linguistic weight to \SearchBestLingWeight{}, so it scores
+\NSearchBestAttackScored{} attack probes above zero. It ranks best by
+flagging nothing it could get wrong, which is the degenerate case the
+proposition names. The best $F_1$ at any
 threshold under any weight vector is \SearchBestFO{}\%, which is exactly the
 \SearchTrivialFO{}\% of marking every probe positive. Excluding thresholds
 that mark everything or nothing, the best is \SearchBestFOneNonTrivial{}\%.
@@ -924,6 +1046,28 @@ zero-shot guard agrees with the flag channel on \GuardFlagAgree{}\%, and on
 does not. A deployment that requires both channels to fire would lose those
 detections. A deployment that takes either would inherit the flag channel's
 documentation false positives.
+
+\subsection{Channel ablation}\label{sec:ablation}
+
+Table~\ref{tab:ablation} takes the layered detector apart. Each channel is
+scored alone at the shipped configuration, and then every union of channels,
+a text counting as flagged when any channel in the union flags it. The band
+flags no probe, so adding it to any union changes nothing
+(Proposition~\ref{prop:band} explains why no weight setting would change
+that). Every recall gain past the trained guard alone is paid in false
+positives: all four channels together flag \NAblAllTp{} of \NBoundAttack{}
+attacks and \NAblAllFp{} benign probes, \AblAllFpr{}\% of them.
+
+\begin{table}[t]
+\centering
+\caption{Channel ablation of the layered detector at the shipped
+configuration. A union flags a text when any of its channels does. Counts
+are over \NBoundAttack{} attack and the benign probes of the probe set.}
+\label{tab:ablation}
+\scriptsize
+\setlength{\tabcolsep}{2pt}
+\input{tables/tab_ablation.tex}
+\end{table}
 
 % ============================================================
 \section{Results: The Trained Guard's Recorded Metric Hides Its False Positives}\label{sec:evalgap}

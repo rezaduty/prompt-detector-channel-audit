@@ -1,4 +1,6 @@
 metric,value
+AblAllFpr,0.475
+AblAllTpr,0.9803921568627451
 AurocScoreAttack,0.3254901960784314
 AurocScorePrompt,0.9778481012658228
 AurocScoreSfive,0.2810897435897436
@@ -39,6 +41,14 @@ BinTprSsixTr,1.0
 BinTprSsixZs,0.8333333333333334
 BinTprTr,0.9803921568627451
 BinTprZs,0.8431372549019608
+BoundAttackMaxHits,2
+BoundAttackMaxScore,8
+BoundAurocMax,0.5
+BoundAurocMaxLingOn,0.39534313725490194
+BoundBandLow,15
+BoundBenignMaxHits,3
+BoundLingPerHit,4
+BoundScoreCap,100
 CarrierMaxDirectScore,14
 CarrierMaxNodeScore,33
 CatInflationSfiveTr,0.0
@@ -160,6 +170,9 @@ MeanScoreSafe,3.5
 MeanScoreSfive,0.5128205128205128
 MeanScoreSsix,2.6666666666666665
 MeanSentPerProbe,1.2197802197802199
+NAblAllFp,19
+NAblAllTp,50
+NAblationRows,15
 NAttack,51
 NBandedAttack,0
 NBandedSafe,0
@@ -185,6 +198,12 @@ NBinTprIndTr,10
 NBinTprIndZs,9
 NBinTprRpTr,8
 NBinTprRpZs,6
+NBoundAttack,51
+NBoundAttackLing,11
+NBoundAttackSilent,40
+NBoundBenignLing,17
+NBoundBenignMaxHits,3
+NBoundFlaggedZeroFp,0
 NCarrierCells,455
 NCarrierNodes,1
 NCarrierNodesAttack,0
@@ -255,6 +274,8 @@ NPromptShaped,12
 NRepeats,3
 NRp,8
 NSafe,40
+NScoreModelCells,91000
+NSearchBestAttackScored,0
 NSearchCells,91000
 NSearchConfigs,1000
 NSentFpSafe,9
@@ -299,6 +320,7 @@ SearchBestAuroc,0.45
 SearchBestConfigId,15
 SearchBestF1,0.7183098591549296
 SearchBestFOneNonTrivial,0.275
+SearchBestLingWeight,0
 SearchMeanAuroc,0.3256600490196033
 SearchMeanF1,0.7183098591549398
 SearchMinAuroc,0.32254901960784316

@@ -182,6 +182,117 @@ def main():
     check("SearchBestAuroc", 100 * best, M["SearchBestAuroc"], tol=0.2)
     check("SearchNAboveHalf", above, M["SearchNAboveHalf"], tol=0)
 
+
+    # ---- exact bounds over the weights, rebuilt without analyze.py
+    # The score is taken from scanner/signals.py: the capped sum of the fired
+    # signals' weights, the linguistic term min(w_ling, 4 * hits). Hits are
+    # read off configurations whose linguistic cap cannot bind, then the
+    # model must reproduce every recorded cell before any bound is trusted.
+    base = pd.read_csv(R / "baseline.csv")
+    fired = {r.id: [g for g in re.split(r"[;|,]", str(r.direct_signals)) if g and g != "nan"]
+             for r in base.itertuples()}
+    lab = dict(zip(base.id, base.true_label))
+    wcols = [c for c in cfgs.columns if c.startswith("w_")]
+    Wv = {int(r["config_id"]): {c[2:]: int(r[c]) for c in wcols} for _, r in cfgs.iterrows()}
+    cell = {(r.probe_id, int(r.config_id)): float(r.score) for r in sc.itertuples()}
+    hit = {}
+    for pid, fs in fired.items():
+        if "linguistic_phrase" not in fs:
+            hit[pid] = 0
+            continue
+        est = set()
+        for cid, w in Wv.items():
+            other = sum(w[g] for g in fs if g != "linguistic_phrase")
+            val = cell[(pid, cid)]
+            if w["linguistic_phrase"] >= 40 and val < 100:
+                est.add(round((val - other) / 4))
+        if len(est) != 1:
+            FAILURES.append(f"bounds: hits for {pid} are not identified ({sorted(est)})")
+            continue
+        hit[pid] = est.pop()
+
+    def sc_of(pid, w):
+        t = 0
+        for g in fired[pid]:
+            t += min(w["linguistic_phrase"], 4 * hit[pid]) if g == "linguistic_phrase" else w[g]
+        return min(100, t)
+    mism = sum(1 for (pid, cid), v in cell.items() if pid in hit and sc_of(pid, Wv[cid]) != v)
+    check("NScoreModelCells", len(cell) - mism, M["NScoreModelCells"], tol=0)
+    if mism:
+        FAILURES.append(f"bounds: the score model misses {mism} recorded cells")
+    atk_ids = [p for p in fired if lab[p] != "SAFE"]
+    ben_ids = [p for p in fired if lab[p] == "SAFE"]
+    silent = [p for p in atk_ids if not fired[p]]
+    active = [p for p in atk_ids if fired[p]]
+    thr = {t["key"]: t["value"] for t in json.load(open(R / "run_meta.json"))["scoring"]["thresholds"]}
+    check("BoundLingPerHit", thr["linguistic_per_hit"], M["BoundLingPerHit"], tol=0)
+    check("BoundScoreCap", thr["max_score"], M["BoundScoreCap"], tol=0)
+    check("BoundBandLow", thr["band_low"], M["BoundBandLow"], tol=0)
+    check("NBoundAttack", len(atk_ids), M["NBoundAttack"], tol=0)
+    check("NBoundAttackSilent", len(silent), M["NBoundAttackSilent"], tol=0)
+    check("NBoundAttackLing", len(active), M["NBoundAttackLing"], tol=0)
+    if any(fired[p] != ["linguistic_phrase"] for p in active):
+        FAILURES.append("bounds: an attack fires a non-linguistic signal")
+    check("BoundAttackMaxHits", max(hit[p] for p in active), M["BoundAttackMaxHits"], tol=0)
+    check("BoundAttackMaxScore", 4 * max(hit[p] for p in active), M["BoundAttackMaxScore"], tol=0)
+    ben_l = [p for p in ben_ids if "linguistic_phrase" in fired[p]]
+    check("NBoundBenignLing", len(ben_l), M["NBoundBenignLing"], tol=0)
+    check("BoundBenignMaxHits", max(hit[p] for p in ben_l), M["BoundBenignMaxHits"], tol=0)
+    # Proposition: any threshold that flags an attack flags a benign probe.
+    # Checked directly over every weight vector that matters for attacks
+    # (w_ling from 0 to 100, the rest set to their largest benign-raising
+    # value is unnecessary: a benign linguistic term alone already suffices).
+    worst = 0
+    for wl in range(0, 101):
+        a_max = max(min(wl, 4 * hit[p]) for p in active)
+        b_lin = max(min(wl, 4 * hit[p]) for p in ben_l)
+        if a_max > b_lin:
+            worst = max(worst, sum(1 for p in active if min(wl, 4 * hit[p]) > b_lin))
+    check("NBoundFlaggedZeroFp", worst, M["NBoundFlaggedZeroFp"], tol=0)
+    # AUROC maximum: enumerate w_ling with the rest at zero, and confirm no
+    # sampled vector (including random ones drawn here) beats it.
+    def au(w):
+        return brute_auroc([sc_of(p, w) for p in atk_ids], [sc_of(p, w) for p in ben_ids])
+    zeros = {c[2:]: 0 for c in wcols}
+    enum = [au({**zeros, "linguistic_phrase": wl}) for wl in range(0, 101)]
+    check("BoundAurocMax", 100 * max(enum), M["BoundAurocMax"], tol=0.05)
+    check("BoundAurocMaxLingOn", 100 * max(enum[1:]), M["BoundAurocMaxLingOn"], tol=0.05)
+    import random as _rnd
+    g = _rnd.Random(20260927)
+    over = 0
+    for _ in range(2000):
+        w = {c[2:]: g.randint(0, 100) for c in wcols}
+        over += au(w) > max(enum) + 1e-12
+    over += sum(1 for w in Wv.values() if au(w) > max(enum) + 1e-12)
+    if over:
+        FAILURES.append(f"bounds: {over} weight vectors beat the claimed AUROC maximum")
+    bcid = int(M["SearchBestConfigId"])
+    check("SearchBestLingWeight", Wv[bcid]["linguistic_phrase"], M["SearchBestLingWeight"], tol=0)
+    check("NSearchBestAttackScored", sum(1 for p in atk_ids if sc_of(p, Wv[bcid]) > 0),
+          M["NSearchBestAttackScored"], tol=0)
+
+    # ---- channel ablation table, recomputed from baseline.csv
+    atk_m = base.true_label.isin(["S5", "S6"])
+    safe_m = base.true_label == "SAFE"
+    chans = {"Band": base.direct_band.fillna("none") != "none",
+             "Flags": base.direct_flags.fillna("").astype(str) != "",
+             "Zero-shot guard": base.local_bionic_guard_unsafe.astype(str) == "True",
+             "Trained guard": base.model_67276875f520_unsafe.astype(str) == "True"}
+    table = (T / "tab_ablation.tex").read_text()
+    import itertools as _it
+    nrows = 0
+    for k in range(1, 5):
+        for combo in _it.combinations(list(chans), k):
+            det = chans[combo[0]].copy()
+            for c in combo[1:]:
+                det = det | chans[c]
+            tp, fp = int((det & atk_m).sum()), int((det & safe_m).sum())
+            row = f"{' + '.join(combo)} & {tp}/{int(atk_m.sum())} "
+            if row not in table or f"& {fp}/{int(safe_m.sum())} " not in table.split(row, 1)[1].split("\\\\", 1)[0] + " ":
+                FAILURES.append(f"ablation: row {' + '.join(combo)} disagrees with baseline.csv")
+            nrows += 1
+    check("NAblationRows", nrows, M["NAblationRows"], tol=0)
+
     # ---- external corpus
     ext = pd.read_csv(R / "external.csv")
     e_atk = ext.label == 1

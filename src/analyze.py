@@ -20,6 +20,7 @@ Outputs:
 """
 import csv
 import json
+import itertools
 import math
 import pathlib
 import re
@@ -638,6 +639,8 @@ def main():
     put("DefGainedFp", s01)
 
     # ---------------------------------------------------- emit
+    exact_weight_bounds(base)
+    channel_ablation(base)
     write_metrics()
     panel_comparison(base)
     write_macros()
@@ -646,6 +649,135 @@ def main():
     write_sentence_tables(tag_rows)
     write_external_table()
     print(f"Wrote {len(METRICS)} metrics")
+
+
+# ------------------------------------------------ exact bounds over the weights
+
+SIGNAL_ORDER = ["role_message", "framework_construct", "prompt_var_name", "yaml_key",
+                "md_heading", "structural_corroboration", "linguistic_phrase",
+                "length_multiline", "template_placeholder", "few_shot_markers"]
+LING = "linguistic_phrase"
+# Scoring constants as captured from the live service (run_meta.json):
+# the linguistic weight is min(cap, per_hit * distinct hits), the final score
+# is clamped to max_score, and band_low gates the lowest band.
+_THR = {t["key"]: t["value"] for t in json.load(open(R / "run_meta.json"))["scoring"]["thresholds"]}
+LING_PER_HIT = int(_THR["linguistic_per_hit"])
+SCORE_CAP = int(_THR["max_score"])
+BAND_LOW = int(_THR["band_low"])
+
+
+def score_model(fired, hits, w):
+    """The layered detector's score as written in scanner/signals.py:
+    min(cap, sum of the weights of the signals that fire, with the linguistic
+    term min(w_ling, 4 * hits))."""
+    tot = 0
+    for g in fired:
+        tot += min(w[LING], LING_PER_HIT * hits) if g == LING else w[g]
+    return min(SCORE_CAP, tot)
+
+
+def exact_weight_bounds(base):
+    """Replace sampling with proof. Which signals fire is decided by pattern
+    matches and does not depend on the weights, so a probe's score is a known
+    function of the weight vector. The function is first checked against every
+    cell of the random search, then maximised exactly."""
+    fired = {r.id: [g for g in re.split(r"[;|,]", str(r.direct_signals)) if g and g != "nan"]
+             for r in base.itertuples()}
+    label = dict(zip(base.id, base.true_label))
+    sc = pd.read_csv(R / "weight_search_scores.csv")
+    cfgs = pd.read_csv(R / "weight_search.csv")
+    W = {int(r.config_id): {g: int(getattr(r, "w_" + g)) for g in SIGNAL_ORDER}
+         for r in cfgs.itertuples()}
+    cells = {(r.probe_id, int(r.config_id)): float(r.score) for r in sc.itertuples()}
+    hits = {}
+    for pid, fs in fired.items():
+        cands = [0] if LING not in fs else range(1, 40)
+        for h in cands:
+            if all(score_model(fs, h, W[c]) == cells[(pid, c)] for c in W):
+                hits[pid] = h
+                break
+        else:
+            raise SystemExit(f"score model does not reproduce probe {pid}")
+    put("NScoreModelCells", sum(1 for pid in fired for c in W))
+
+    atk = [p for p in fired if label[p] != "SAFE"]
+    ben = [p for p in fired if label[p] == "SAFE"]
+    silent = [p for p in atk if not fired[p]]
+    active = [p for p in atk if fired[p]]
+    if any(set(fired[p]) != {LING} for p in active):
+        raise SystemExit("an attack fires a non-linguistic signal, the bounds below need revisiting")
+    put("NBoundAttack", len(atk))
+    put("NBoundAttackSilent", len(silent))
+    put("NBoundAttackLing", len(active))
+    put("BoundAttackMaxHits", max(hits[p] for p in active))
+    ben_ling = [p for p in ben if LING in fired[p]]
+    put("NBoundBenignLing", len(ben_ling))
+    put("BoundBenignMaxHits", max(hits[p] for p in ben_ling))
+    put("NBoundBenignMaxHits", sum(1 for p in ben_ling if hits[p] == max(hits[q] for q in ben_ling)))
+    put("BoundAttackMaxScore", LING_PER_HIT * max(hits[p] for p in active))
+    put("BoundBandLow", BAND_LOW)
+    put("BoundLingPerHit", LING_PER_HIT)
+    put("BoundScoreCap", SCORE_CAP)
+
+    # Attack scores depend on w_ling alone, and every benign score is
+    # non-decreasing in every weight, so AUROC is non-increasing in every
+    # non-linguistic weight: its maximum has them at zero. Enumerate w_ling.
+    def auroc_at(wl):
+        w = {g: 0 for g in SIGNAL_ORDER}
+        w[LING] = wl
+        a = [score_model(fired[p], hits[p], w) for p in atk]
+        b = [score_model(fired[p], hits[p], w) for p in ben]
+        return auroc(a, b), a, b
+    best, best_on, zero_fp = -1.0, -1.0, 0
+    for wl in range(0, 101):
+        v, a, b = auroc_at(wl)
+        best = max(best, v)
+        if wl > 0:
+            best_on = max(best_on, v)
+        for t in range(1, SCORE_CAP + 1):
+            if max(b) < t:
+                zero_fp = max(zero_fp, sum(x >= t for x in a))
+    put("BoundAurocMax", best)
+    put("BoundAurocMaxLingOn", best_on)
+    put("NBoundFlaggedZeroFp", zero_fp)
+    best_cfg = int(METRICS["SearchBestConfigId"]) if "SearchBestConfigId" in METRICS else None
+    if best_cfg is not None:
+        put("SearchBestLingWeight", W[best_cfg][LING])
+        put("NSearchBestAttackScored", sum(1 for p in atk if score_model(fired[p], hits[p], W[best_cfg]) > 0))
+
+
+def channel_ablation(base):
+    """Each channel of the layered detector alone and in every union, over
+    attack and benign probes, at the shipped configuration."""
+    atk = base.true_label.isin(["S5", "S6"])
+    safe = base.true_label == "SAFE"
+    ch = {
+        "Band": base.direct_band.fillna("none") != "none",
+        "Flags": base.direct_flags.fillna("").astype(str).str.len() > 0,
+        "Zero-shot guard": base.local_bionic_guard_unsafe.astype(str) == "True",
+        "Trained guard": base.model_67276875f520_unsafe.astype(str) == "True",
+    }
+    names = list(ch)
+    rows = []
+    for k in range(1, len(names) + 1):
+        for combo in itertools.combinations(names, k):
+            det = ch[combo[0]].copy()
+            for c in combo[1:]:
+                det = det | ch[c]
+            tp, fp = int((det & atk).sum()), int((det & safe).sum())
+            rows.append((" + ".join(combo), tp, int(atk.sum()), fp, int(safe.sum())))
+    lines = ["\\begin{tabular}{lrr}", "\\toprule",
+             "Channels (union) & Attacks flagged & Benign flagged \\\\", "\\midrule"]
+    for name, tp, na, fp, nb in rows:
+        lines.append(f"{name} & {tp}/{na} ({pct(tp / na)}\\%) & {fp}/{nb} ({pct(fp / nb)}\\%) \\\\")
+    lines += ["\\bottomrule", "\\end{tabular}"]
+    (T / "tab_ablation.tex").write_text("\n".join(lines) + "\n")
+    put("NAblationRows", len(rows))
+    full = rows[-1]
+    put("AblAllTpr", full[1] / full[2])
+    put("AblAllFpr", full[3] / full[4])
+    put("NAblAllTp", full[1])
+    put("NAblAllFp", full[3])
 
 
 # ------------------------------------------------ explanation fidelity
@@ -947,7 +1079,7 @@ def write_macros():
             elif k.startswith(("N", "Search Best Config")) or k.endswith("ConfigId"):
                 s = str(int(v))
             elif 0.0 <= v <= 1.0 and any(k.startswith(p) for p in (
-                    "Band", "Flag", "Kip", "Mdl", "Auroc", "Bin", "Cat", "Exact",
+                    "Band", "Flag", "Kip", "Mdl", "Auroc", "Bound", "Abl", "Bin", "Cat", "Exact",
                     "Degen", "Stable", "Guard", "Def", "Search", "Thresh", "Sweep",
                     "Sfive", "Ssix", "Explain", "Sent", "TagAtk", "TagBen",
                     "Ext", "Probe")) \
